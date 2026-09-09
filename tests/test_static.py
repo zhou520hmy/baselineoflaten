@@ -4,8 +4,8 @@ from suite.common import ROOT,rows
 from suite.scoring import numeric,parse_answer,simple_score,extract_code
 class PortableContract(unittest.TestCase):
  def test_sources_parse(self):
-  for folder in ('suite','tests','sandbox'):
-   for path in (ROOT/folder).glob('*.py'):ast.parse(path.read_text(),filename=str(path))
+  for folder in ('suite','tests','sandbox','vendor'):
+   for path in (ROOT/folder).rglob('*.py'):ast.parse(path.read_text(),filename=str(path))
  def test_matrix_and_pins(self):
   c=json.loads((ROOT/'configs/default.json').read_text());self.assertEqual(len(c['families'])*len(c['methods'])*len(c['datasets']),70);self.assertEqual(sum(c['datasets'].values()),5907)
   for source in json.loads((ROOT/'evidence/hf_sources.json').read_text()).values():self.assertEqual(len(source['sha']),40)

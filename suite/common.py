@@ -35,7 +35,7 @@ def rows(path,repair=False):
 
 def config(path=None):return read(path or ROOT/'configs/default.json')
 def identity(config):
- sources={str(p.relative_to(ROOT)):sha(p) for folder in ('suite','vendor') for p in (ROOT/folder).glob('*') if p.is_file() and p.suffix in ('.py','.json')}
+ sources={str(p.relative_to(ROOT)):sha(p) for folder in ('suite','vendor') for p in (ROOT/folder).rglob('*') if p.is_file() and p.suffix in ('.py','.json','.jsonl')}
  return canon({'config':config,'sources':sources,'dependencies':sha(ROOT/'requirements.txt')})
 def seal(directory,key,metadata):
  path=Path(directory)/'manifest.json';old=read(path)
@@ -51,3 +51,9 @@ def run(command,**kwargs):return subprocess.run(command,check=True,**kwargs)
 def model_path(family):return STORE/'models'/family
 
 def stage_dir(family,stage):return STORE/'runs'/family/'training'/stage
+
+def compatible_export_identities(cfg):
+ current=identity(cfg);allowed={current};previous=read(ROOT/'evidence/previous_release.json')
+ if cfg.get('semantic_benchmark',{}).get('reuse_completed_previous_release_exports') and previous and {k:v for k,v in cfg.items() if k!='semantic_benchmark'}==previous['config']:
+  allowed.add(previous['identity'])
+ return allowed

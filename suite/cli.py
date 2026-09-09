@@ -78,7 +78,7 @@ def child(action,cfg_path,*extra):
  return subprocess.run(command,cwd=C.ROOT).returncode
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('action',choices=['all','preflight-host','_doctor','download','collect','train','evaluate','smoke','report','status']);p.add_argument('--config',default=str(C.ROOT/'configs/default.json'));p.add_argument('--family',choices=['4b','8b']);p.add_argument('--method',choices=['latentmas','latentmas_h2o','latentmas_hidden','latcom','interlat']);p.add_argument('--stage',choices=['latcom_stage1','latcom_stage2','interlat_receiver','interlat_compression']);a=p.parse_args();cfg=C.config(a.config);C.STORE.mkdir(parents=True,exist_ok=True)
+ p=argparse.ArgumentParser();p.add_argument('action',choices=['all','preflight-host','_doctor','download','collect','train','evaluate','semantic','semantic-all','semantic-smoke','smoke','report','status']);p.add_argument('--config',default=str(C.ROOT/'configs/default.json'));p.add_argument('--family',choices=['4b','8b']);p.add_argument('--method',choices=['latentmas','latentmas_h2o','latentmas_hidden','latcom','interlat']);p.add_argument('--stage',choices=['latcom_stage1','latcom_stage2','interlat_receiver','interlat_compression']);a=p.parse_args();cfg=C.config(a.config);C.STORE.mkdir(parents=True,exist_ok=True)
  if a.action=='preflight-host':print(json.dumps(host_checks()));return
  if a.action=='_doctor':doctor();return
  if a.action in ('status','report'):
@@ -97,15 +97,24 @@ def main():
   from .evaluate import evaluate
   if not a.family or not a.method:p.error('--family and --method required')
   evaluate(a.family,a.method,cfg);return
+ if a.action in ('semantic','semantic-smoke'):
+  from .evaluate_semantic import evaluate_semantic
+  if not a.family or not a.method:p.error('--family and --method required')
+  evaluate_semantic(a.family,a.method,cfg,smoke=a.action=='semantic-smoke');return
  # Single coordinator owns a store lock; no simultaneous model stages.
  lock=C.STORE/'run.lock'
  with lock.open('a+') as f:
   fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB);host=C.STORE/'environment/host.json';C.write(host,host_checks())
-  cfg_path=__import__('pathlib').Path(a.config).resolve();key=C.identity(cfg);C.seal(C.STORE/'run_identity',key,{'config':cfg})
+  cfg_path=__import__('pathlib').Path(a.config).resolve();key=C.identity(cfg);C.seal(C.STORE/('semantic_run_identity' if a.action=='semantic-all' else 'run_identity'),key,{'config':cfg})
   if child('_doctor',cfg_path)!=0:raise RuntimeError('B200 environment validation failed')
-  if child('download',cfg_path)!=0:raise RuntimeError('Download/setup failed')
+  if a.action!='semantic-all' and child('download',cfg_path)!=0:raise RuntimeError('Download/setup failed')
   from .report import report
   for family in ([a.family] if a.family else cfg['families']):
+   if a.action=='semantic-all':
+    for method in cfg['methods']:
+     rc=child('semantic',cfg_path,'--family',family,'--method',method);report(cfg,False)
+     if rc:raise RuntimeError(f'{family}/{method} semantic evaluation stopped; saved progress retained')
+    continue
    # Short real-model interface checks; separate directory, never counted as benchmark scores.
    for method in ('latentmas','latentmas_h2o','latentmas_hidden'):
     command=[sys.executable,'-c','from suite.common import config; from suite.evaluate import evaluate; import sys; evaluate(sys.argv[1],sys.argv[2],config(sys.argv[3]),smoke=True)',family,method,str(cfg_path)]
@@ -115,6 +124,7 @@ def main():
     if method not in cfg['methods']:continue
     rc=child('evaluate',cfg_path,'--family',family,'--method',method);report(cfg,False)
     if rc:raise RuntimeError(f'{family}/{method} stopped with code {rc}; saved results retained')
+    if cfg.get('semantic_benchmark',{}).get('enabled') and child('semantic',cfg_path,'--family',family,'--method',method):raise RuntimeError('Semantic evaluation stopped; saved progress retained')
    if any(m in cfg['methods'] for m in ('latcom','interlat')):
     rc=child('collect',cfg_path,'--family',family)
     if rc:raise RuntimeError('Training data collection stopped; saved progress retained')
@@ -125,8 +135,10 @@ def main():
      if rc:raise RuntimeError(f'{family}/{stage} stopped with code {rc}; checkpoint retained')
     rc=child('evaluate',cfg_path,'--family',family,'--method',method);report(cfg,False)
     if rc:raise RuntimeError(f'{family}/{method} stopped; saved generations/results retained')
+    if cfg.get('semantic_benchmark',{}).get('enabled') and child('semantic',cfg_path,'--family',family,'--method',method):raise RuntimeError('Semantic evaluation stopped; saved progress retained')
   complete=report(cfg)
-  if a.action=='all' and complete:C.write(C.STORE/'COMPLETE.json',{'identity':key,'completed_cells':len(cfg['families'])*len(cfg['methods'])*len(cfg['datasets']),'time':C.now()})
+  if a.action=='semantic-all' and C.read(C.STORE/'reports/semantic_summary.json')['complete']:C.write(C.STORE/'SEMANTIC_COMPLETE.json',{'identity':key,'completed_cells':len(cfg['families'])*len(cfg['methods']),'time':C.now()})
+  if a.action=='all' and complete:C.write(C.STORE/'COMPLETE.json',{'identity':key,'completed_cells':len(cfg['families'])*len(cfg['methods'])*(len(cfg['datasets'])+int(cfg.get('semantic_benchmark',{}).get('enabled',False))),'time':C.now()})
 if __name__=='__main__':
  try:main()
  except Exception as e:

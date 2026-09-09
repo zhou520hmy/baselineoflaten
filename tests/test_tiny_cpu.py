@@ -7,7 +7,7 @@ from suite.models import SlotCompressor,InterlatCompressor,InterlatReceiver,froz
 from suite.losses import js,latent_margin
 class Tokenizer:
  def encode(self,s,add_special_tokens=False):return [ord(c)%95+1 for c in s]
- def decode(self,ids,skip_special_tokens=False):return ' '.join(str(int(i)) for i in ids)
+ def decode(self,ids,skip_special_tokens=False,**kwargs):return ' '.join(str(int(i)) for i in ids)
  def apply_chat_template(self,messages,**kw):return '<|im_start|>system\nhelp<|im_end|>\n<|im_start|>user\n'+messages[-1]['content']+'<|im_end|>\n<|im_start|>assistant\n'
 class TinyCPU(unittest.TestCase):
  @classmethod

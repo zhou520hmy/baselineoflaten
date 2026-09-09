@@ -9,7 +9,7 @@ This is a portable **paper-derived comparison suite**, not a claim of exact auth
 - LatCom: author-provided LatCom manuscript (not redistributed), SHA256 `136736974403008fbc5e224f156bf20992d76eb22fdf4313a624f99f47ff4c0a`. No verified author repository or trained weights was found. The implementation follows its equations; unspecified settings are listed below.
 - B200 runtime: PyTorch 2.7.1 CUDA 12.8 wheels, Transformers 4.57.6; HF/PyTorch runtime only, no vLLM. SDPA for prefill and answer generation; eager attention during latent rollout for all LatentMAS-derived methods, enabling exact headwise H2O attention collection.
 
-## Matrix
+## General-task matrix
 
 Five methods × two Qwen3 scales × seven datasets = 70 evaluation cells. All cells use the same locked rows, prompts, deterministic per-example random seed, temperature 0.6 and top-p 0.95. Top-k is disabled because LatCom does not specify it. Three senders use math/science/code role prompts. The final receiver has the public question, with no gold answers or hidden test code in model prompts. A single sampled answer per example yields accuracy or code pass@1, not pass@k.
 
@@ -30,7 +30,7 @@ The final token caps are 2048 for GSM8K/ARC, 4096 for MedQA/code, 8192 for GPQA.
 
 The report always carries `paper_derived_port` provenance for learned methods. Never mix its results with published author numbers as if runtime/checkpoints were matched. Record training cost separately from inference. Report whole-task synchronized warm latency, output token IDs across all agents, prompt tokens, model-prefill positions, generated latent positions, cumulative communication positions/bytes and peak allocated GPU memory. Communication volume and token output are separate quantities.
 
-Infrastructure failures (OOM, corrupt data, Docker launch failure) are typed errors and stop that cell; they are not scored as incorrect answers. Normal model parse failures, wrong answers, generation cap and code timeouts remain in the scoring denominator. Incomplete cells are explicitly incomplete and cannot generate a final 70-cell completed marker.
+Infrastructure failures (OOM, corrupt data, Docker launch failure) are typed errors and stop that cell; they are not scored as incorrect answers. Normal model parse failures, wrong answers, generation cap and code timeouts remain in the scoring denominator. Incomplete cells are explicitly incomplete and cannot generate a final all-suite completed marker.
 
 Sources: https://github.com/Gen-Verse/LatentMAS ; https://github.com/XiaoDu-flying/Interlat ; https://arxiv.org/abs/2511.09149 ; https://pytorch.org/blog/pytorch-2-7/ ; https://pytorch.org/get-started/previous-versions/ ; pinned HF repos in `evidence/hf_sources.json`.
 
@@ -47,3 +47,7 @@ Sources: https://github.com/Gen-Verse/LatentMAS ; https://github.com/XiaoDu-flyi
 Interlat uses learned continuous begin/end vectors rather than extending Qwen3's token vocabulary. The source objective and adapter structure inform the implementation; this detail, training corpus, task prompts, curriculum schedule and budgets are port decisions. No V6 or LoRA checkpoint is used.
 
 Portable contract tests use local fixtures. Numeric tests use randomly initialized tiny Qwen3 CPU models, proving basic interface and gradient behavior only. Neither the full models, B200 memory headroom, training convergence nor benchmark accuracy have been measured in the preparation environment. The target-server pipeline performs a BF16 CUDA check and three short real-model interface smokes before evaluating a family. A learned method is evaluated only after its training export exists with a matching run identity and weight hash.
+
+## Added project Benchmark
+
+The 70 general-task cells remain intact. The frozen LATEN Benchmark adds 10 cells with 648 variants each, bringing the default run to 80 cells and 65,550 attempts. See [LATEN_BENCHMARK_PROTOCOL.md](LATEN_BENCHMARK_PROTOCOL.md) for immutable data, original prompt/scorer reuse, serial communication adaptations, 2048-token native decoding, efficiency scope and previous-release export compatibility. Its semantic metrics are reported separately from the seven-task macro.

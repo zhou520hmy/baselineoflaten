@@ -1,0 +1,16 @@
+{
+  "benchmark_version": "2.1.0",
+  "counterfactuals_per_case": 3,
+  "development_base_tasks": 27,
+  "development_conditions": 108,
+  "information_vector_lengths": [
+    3,
+    6,
+    9
+  ],
+  "test_base_tasks": 135,
+  "test_conditions": 540,
+  "test_inference_authorized": false,
+  "total_base_tasks": 162,
+  "total_conditions": 648
+}

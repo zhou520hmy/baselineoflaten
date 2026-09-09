@@ -102,5 +102,18 @@
     "cpus": 1,
     "expanded_tests_version": "pinned_HF_evalplus_parquet_not_evalplus_0.3.1_regeneration"
   },
-  "evaluation_limit_per_dataset": null
+  "evaluation_limit_per_dataset": null,
+  "semantic_benchmark": {
+    "enabled": true,
+    "protocol": "frozen_v2_3_five_methods_every_edge_20260909",
+    "cases": 162,
+    "variants": 648,
+    "pairs": 486,
+    "sender_latent_steps": 10,
+    "reasoning_max_new_tokens": 2048,
+    "do_sample": false,
+    "test_scope": "previously_exposed_test_diagnostic",
+    "data_root": "vendor/laten/data",
+    "reuse_completed_previous_release_exports": true
+  }
 }

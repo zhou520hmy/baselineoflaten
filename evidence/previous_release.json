@@ -1,0 +1,111 @@
+{
+  "commit": "1f98984f200540158e6801cecb00d67960fe9c69",
+  "identity": "683d8f8330537233b3eee885b6961cdbaf68c2495f67f62fa471f8a13d0df59d",
+  "config": {
+    "schema": 1,
+    "protocol": "latcom_suite_qwen3_port_v1",
+    "families": {
+      "4b": {
+        "repo": "Qwen/Qwen3-4B",
+        "revision": "1cfa9a7208912126459214e8b04321603b3df60c"
+      },
+      "8b": {
+        "repo": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218"
+      }
+    },
+    "methods": [
+      "latentmas",
+      "latentmas_h2o",
+      "latentmas_hidden",
+      "latcom",
+      "interlat"
+    ],
+    "datasets": {
+      "gsm8k": 1319,
+      "arc_easy": 2376,
+      "arc_challenge": 1172,
+      "medqa": 300,
+      "mbppplus": 378,
+      "humanevalplus": 164,
+      "gpqa": 198
+    },
+    "caps": {
+      "gsm8k": 2048,
+      "arc_easy": 2048,
+      "arc_challenge": 2048,
+      "medqa": 4096,
+      "mbppplus": 4096,
+      "humanevalplus": 4096,
+      "gpqa": 8192
+    },
+    "seed": 42,
+    "temperature": 0.6,
+    "top_p": 0.95,
+    "top_k": 0,
+    "sender_latent_steps": 40,
+    "latcom_slots": 64,
+    "interlat_slots_per_sender": 21,
+    "h2o_prompt_budget_per_sender_per_head": 64,
+    "sender_thinking": false,
+    "receiver_thinking": true,
+    "sender_context": "sequential_persistent_cache_as_official_hierarchical_code",
+    "attention_backend": "sdpa_prefill_and_receiver_eager_latent_steps_for_headwise_scores",
+    "max_prompt_tokens": 12000,
+    "training": {
+      "candidate_limit": 1024,
+      "retained_limit": 512,
+      "minimum_retained": 32,
+      "candidate_fraction_hotpot": 0.5,
+      "aux_math": 32,
+      "aux_code": 32,
+      "rationale_max_new_tokens": 384,
+      "filter_max_new_tokens": 512,
+      "plan_max_new_tokens": 384,
+      "max_evidence_tokens": 1024,
+      "max_target_tokens": 512,
+      "latcom_stage1_steps": 300,
+      "latcom_stage2_steps": 300,
+      "interlat_receiver_steps": 300,
+      "interlat_compression_steps": 300,
+      "latcom_global_batch": 64,
+      "interlat_receiver_global_batch": 16,
+      "interlat_compression_global_batch": 4,
+      "learning_rates": {
+        "latcom_stage1": 2e-05,
+        "latcom_stage2": 1e-05,
+        "interlat_receiver": 2e-05,
+        "interlat_compression": 1e-05
+      },
+      "weight_decay": 0.01,
+      "betas": [
+        0.9,
+        0.95
+      ],
+      "warmup_ratio": 0.05,
+      "clip_grad_norm": 1.0,
+      "save_every": 25,
+      "cpu_saved_activations": true,
+      "latcom_contrast_margin": 0.57,
+      "latcom_contrast_temperature": 1.0,
+      "latcom_anchor_weight": 0.3,
+      "adaptive_weight_rule": "clamp(0.1 * detached_task / abs(detached_aux), min, max)",
+      "interlat_separation_weight": 1.5,
+      "interlat_alignment_weight": 0.5,
+      "interlat_kl_fraction": 0.7,
+      "interlat_compression_pref_weight": 1.0,
+      "interlat_compression_geometry_weight": 0.1,
+      "interlat_curriculum": "linear_plan_prefix_fraction_1_to_0_first_80_percent",
+      "retain_final_optimizer": false
+    },
+    "code_tests": {
+      "timeout_seconds": 30,
+      "docker_image": "laten-b200-code:v1",
+      "memory": "2g",
+      "cpus": 1,
+      "expanded_tests_version": "pinned_HF_evalplus_parquet_not_evalplus_0.3.1_regeneration"
+    },
+    "evaluation_limit_per_dataset": null
+  },
+  "usage": "Accept only completed hash-verified inference exports with this original configuration; never resume old optimizers under new source identity."
+}

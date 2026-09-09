@@ -1,0 +1,39 @@
+{
+  "time_beijing": "2026-09-09T17:32:02+08:00",
+  "validation_type": "local_static_fixture_and_tiny_CPU_only",
+  "tests_passed": 17,
+  "python": "3.10.12",
+  "torch": "2.5.1+cu121",
+  "transformers": "4.57.6",
+  "cuda_initialized": false,
+  "run_identity": "683d8f8330537233b3eee885b6961cdbaf68c2495f67f62fa471f8a13d0df59d",
+  "full_model_downloaded": false,
+  "gpu_training_or_benchmark_run": false,
+  "b200_runtime_verified": false,
+  "checks": [
+    {
+      "check": "shell_syntax",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "check": "static_and_data_fixtures",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "test_all_seven_schemas_and_training_split (test_data_fixture.DataFixture) ... ok\ntest_code (test_static.PortableContract) ... ok\ntest_gold_not_in_engine (test_static.PortableContract) ... ok\ntest_journal_recovery (test_static.PortableContract) ... ok\ntest_matrix_and_pins (test_static.PortableContract) ... ok\ntest_numeric_choice (test_static.PortableContract) ... ok\ntest_portable (test_static.PortableContract) ... ok\ntest_sources_parse (test_static.PortableContract) ... ok\n\n----------------------------------------------------------------------\nRan 8 tests in 0.289s\n\nOK\n"
+    },
+    {
+      "check": "tiny_cpu_numeric",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "test_alignment_actual_inputs (test_tiny_cpu.TinyCPU) ... ok\ntest_frozen_receiver_slot_gradient (test_tiny_cpu.TinyCPU) ... ok\ntest_headwise_selection (test_tiny_cpu.TinyCPU) ... ok\ntest_interlat_recurrence (test_tiny_cpu.TinyCPU) ... ok\ntest_learned_pipelines (test_tiny_cpu.TinyCPU) ... ok\ntest_loss_signs (test_tiny_cpu.TinyCPU) ... ok\ntest_pruned_absolute_positions (test_tiny_cpu.TinyCPU) ... ok\ntest_receiver_and_compression_gradients (test_tiny_cpu.TinyCPU) ... ok\ntest_three_pipelines (test_tiny_cpu.TinyCPU) ... ok\n\n----------------------------------------------------------------------\nRan 9 tests in 0.694s\n\nOK\n"
+    },
+    {
+      "check": "empty_state_reporting",
+      "exit_code": 0,
+      "stdout": "# B200 baseline comparison\nUpdated (Beijing): 2026-09-09T17:32:02+08:00\n\n**Actual portable-suite results; not copied paper scores.** Incomplete denominators are shown explicitly.\n\n## Qwen3-4B\n\n| Method | gsm8k | arc_easy | arc_challenge | medqa | mbppplus | humanevalplus | gpqa | Macro accuracy |\n|---|---|---|---|---|---|---|---|---|\n| latentmas | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| latentmas_h2o | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| latentmas_hidden | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| latcom | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| interlat | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n\n## Qwen3-8B\n\n| Method | gsm8k | arc_easy | arc_challenge | medqa | mbppplus | humanevalplus | gpqa | Macro accuracy |\n|---|---|---|---|---|---|---|---|---|\n| latentmas | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| latentmas_h2o | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| latentmas_hidden | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| latcom | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| interlat | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n\n## Training stages\n\n| Family | Stage | State | Step |\n|---|---|---|---|\n| 4b | latcom_stage1 | pending | — |\n| 4b | latcom_stage2 | pending | — |\n| 4b | interlat_receiver | pending | — |\n| 4b | interlat_compression | pending | — |\n| 8b | latcom_stage1 | pending | — |\n| 8b | latcom_stage2 | pending | — |\n| 8b | interlat_receiver | pending | — |\n| 8b | interlat_compression | pending | — |\n\nEfficiency CSV covers every sender and final receiver; setup, training, code judging are excluded from inference time. Generated text tokens, latent positions, prefill and bytes are distinct. GPU scheduling and H2O attention overhead must be retained when comparing these measurements.\n",
+      "stderr": ""
+    }
+  ]
+}

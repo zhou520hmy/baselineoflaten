@@ -1,0 +1,47 @@
+{
+  "benchmark_version": "2.1.0",
+  "files": {
+    "dev/cases.jsonl": {
+      "bytes": 152442,
+      "sha256": "f4e894053d88b381705d960042b9d05c5fa9f8cbafe503093f9db03ca4b33612"
+    },
+    "dev/prompt_snapshots.jsonl": {
+      "bytes": 137394,
+      "sha256": "551abb6790cf92b11b79e1efdb7f4cd573791914254f053ad803775d6d9603d4"
+    },
+    "dev/variants.jsonl": {
+      "bytes": 226131,
+      "sha256": "37a34fcd896546fcfcf71ae636e390d9a9251607d32a454a07c3a47fc4521758"
+    },
+    "policy_programs/programs.jsonl": {
+      "bytes": 146544,
+      "sha256": "a13752d60a5ed4cfa57935c61d5847852b1bfee9e8b6f714edeb7ca499855ee5"
+    },
+    "source_registry.json": {
+      "bytes": 54278,
+      "sha256": "11ca81a2bde4604bbb3d437c16d7eb24356822ae6bd8fa91537d767e25042db1"
+    },
+    "split_registry.json": {
+      "bytes": 3431,
+      "sha256": "8fcab9d392490c6182bbe94f87904e836de9f1907002bd5a4fdb67df18f67e08"
+    },
+    "summary.json": {
+      "bytes": 336,
+      "sha256": "35c9d24e5561fa3e8dfee866b3c0771ed5e9cd9df31ac0814978f271485e20bb"
+    },
+    "test/cases.jsonl": {
+      "bytes": 760947,
+      "sha256": "f0dfc1ababee8de18da9a211e71fe21965bc83218186a075a9937f323f0bd156"
+    },
+    "test/prompt_snapshots.jsonl": {
+      "bytes": 688230,
+      "sha256": "776595f0ddbf0178443134898fa31c783ca31ae7198d087192e245238909a974"
+    },
+    "test/variants.jsonl": {
+      "bytes": 1131684,
+      "sha256": "91e4f87ca74b4039448d6127ea2774e1f27153d48061cf5db7f0e46743fa8dd1"
+    }
+  },
+  "status": "cpu_candidate",
+  "test_inference_authorized": false
+}

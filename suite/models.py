@@ -40,10 +40,11 @@ class InterlatCompressor(nn.Module):
    states.append(h);x=torch.cat([x,self.h2e(h)[None]])
   return torch.stack(states)
  @torch.no_grad()
- def cached(self,ids):
+ def cached(self,ids,prefix=None):
   from transformers.cache_utils import DynamicCache
   cache=DynamicCache(config=self.backbone.config)
-  out=self.backbone(input_ids=ids[None],past_key_values=cache,use_cache=True,return_dict=True);cache=out.past_key_values;x=self.bos[None];states=[]
+  inputs={'input_ids':ids[None]} if prefix is None else {'inputs_embeds':prefix[None]}
+  out=self.backbone(**inputs,past_key_values=cache,use_cache=True,return_dict=True);cache=out.past_key_values;x=self.bos[None];states=[]
   for _ in range(self.k):
    out=self.backbone(inputs_embeds=x,past_key_values=cache,use_cache=True,return_dict=True);h=out.last_hidden_state[0,-1];states.append(h);cache=out.past_key_values;x=self.h2e(h)[None,None]
   return torch.stack(states)

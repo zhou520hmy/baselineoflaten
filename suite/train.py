@@ -21,7 +21,7 @@ def build_module(family,stage,cfg,dtype=torch.float32,device='cuda:0'):
 def load_export(family,stage,cfg,device='cuda:0'):
  directory=C.stage_dir(family,stage);meta=C.read(directory/'complete.json')
  if not meta:raise RuntimeError('Required trained stage not complete: '+stage)
- if meta['run_identity']!=C.identity(cfg):raise ValueError('Trained-stage configuration/source identity differs')
+ if meta['run_identity'] not in C.compatible_export_identities(cfg):raise ValueError('Trained-stage configuration/source identity differs')
  if C.sha(directory/'weights.pt')!=meta['weights_sha256']:raise ValueError('Trained export hash mismatch')
  obj=build_module(family,stage,cfg,torch.bfloat16,device)
  state=torch.load(directory/'weights.pt',map_location='cpu',weights_only=True);obj.load_state_dict(state,strict=True);del state

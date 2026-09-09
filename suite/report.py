@@ -37,4 +37,10 @@ def report(cfg,print_status=True):
  out=STORE/'reports';out.mkdir(parents=True,exist_ok=True);write(out/'summary.json',{'time':now(),'cells':cells,'complete':all(c['status']=='completed' for c in cells),'expected_cells':len(cells)})
  stream=io.StringIO();writer=csv.DictWriter(stream,fieldnames=list(cells[0]));writer.writeheader();writer.writerows(cells);(out/'summary.csv').write_text(stream.getvalue());(out/'summary.md').write_text('\n'.join(text)+'\n')
  if print_status:print('\n'.join(text))
- return all(c['status']=='completed' for c in cells)
+ from .report_semantic import report_semantic
+ semantic_complete=report_semantic(cfg,print_status)
+ semantic=read(out/'semantic_summary.json',{}) if cfg.get('semantic_benchmark',{}).get('enabled') else {}
+ all_cells=cells+semantic.get('cells',[]);overall=all(c['status']=='completed' for c in cells) and semantic_complete
+ write(out/'suite_summary.json',{'time':now(),'complete':overall,'expected_cells':len(all_cells),'completed_cells':sum(c['status']=='completed' for c in all_cells),'general_report':'summary.csv','semantic_report':'semantic_summary.csv' if semantic else None})
+ if print_status:print(f'Overall: {sum(c["status"]=="completed" for c in all_cells)}/{len(all_cells)} completed cells')
+ return overall

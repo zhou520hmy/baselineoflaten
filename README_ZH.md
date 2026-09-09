@@ -1,6 +1,6 @@
-# 单张 B200：五方法 × 两种模型规模 × 七数据集
+# 单张 B200：五方法 × 两种模型规模 × 七个通用数据集及 LATEN Benchmark
 
-这个目录可以整体复制到另一台服务器。默认模型为 **Qwen3-4B、Qwen3-8B**；单张 B200 串行运行，不使用当前工程的 V6 权重。正式矩阵为 **70 个单元，59,070 次任务推理**，另外包括训练数据生成、两种方法的训练和少量接口检查。
+这个目录可以整体复制到另一台服务器。默认模型为 **Qwen3-4B、Qwen3-8B**；单张 B200 串行运行，不使用当前工程的 V6 权重。正式矩阵为 **80 个单元，65,550 次任务推理**，另外包括训练数据生成、两种方法的训练和少量接口检查。
 
 **重要定位：这是可运行的统一协议复现实验包，不是五种方法的作者原始 checkpoint 集合。** LatentMAS 系列依据固定版本公开实现与论文描述重建接口。Interlat 原项目的模型/任务设置与这里不同；LatCom 尚无核实到的公开作者代码和训练权重。因此，这两个方法包含本包的训练实现，结果始终标记 `paper_derived_port`。它们不能直接称为“完全复现作者结果”。详细公式、输入接口与差异见 [PROTOCOL.md](docs/PROTOCOL.md)。
 
@@ -42,7 +42,7 @@ nohup bash run.sh > run.log 2>&1 &
 | HumanEval+ | 164 | 扩展测试 pass@1 | 4,096 |
 | GPQA-Diamond | 198 | 选择题准确率 | 8,192 |
 
-每组共 5,907 题。MedQA 使用 LatentMAS 已有的 300 题子集，**不是完整 MedQA 测试集**。代码任务固定使用 HF EvalPlus parquet 内的扩展测试，与现有项目协议一致，**不是重新生成的最新版 EvalPlus 测试**。所有版本、分母和原始文件哈希都会保留；完整源码地址/版本见 `evidence/hf_sources.json` 和 `evidence/medqa_provenance.json`。
+七个通用数据集每组共 5,907 题；新增 LATEN Benchmark 每组 648 条，总计每组 6,555 次任务。MedQA 使用 LatentMAS 已有的 300 题子集，**不是完整 MedQA 测试集**。代码任务固定使用 HF EvalPlus parquet 内的扩展测试，与现有项目协议一致，**不是重新生成的最新版 EvalPlus 测试**。所有版本、分母和原始文件哈希都会保留；完整源码地址/版本见 `evidence/hf_sources.json` 和 `evidence/medqa_provenance.json`。
 
 同一题在各方法中使用相同公开问题、题目顺序与角色提示词，采样温度 0.6、top-p 0.95、关闭 top-k、种子 42 派生的逐题随机种子。每题生成一次回答。不同方法使用各自的通信接口，不能把“统一任务协议”理解为通信内容完全一样。
 
@@ -74,6 +74,37 @@ Interlat 使用独立压缩 Sender；其余方法保留所依据公开层级实�
 **300 步、候选数、辅助数据量、部分权重和调度规则是可修改的迁移默认值，不是论文公开的完整训练配方，也不保证收敛。** 详见 `configs/default.json`。首次配置应在运行前确定；修改配置后需使用新的 `LATEN_STORE`，不能混用已封存结果。训练缓存保留不足 32 个主样本会明确停止，不会拿随机压缩器继续产出“基线分数”。
 
 单卡按照“4B 三个免训练基线 → 4B 数据生成/训练/评测 → 8B 同样流程”执行，所有重型阶段独立进程串行退出。两种规模共 2,400 个 optimizer steps，但每步计算成本不同；尚无 B200 实测速度，不能保证若干小时内完成整套任务。
+
+## 新增：我们自己的 LATEN Benchmark
+
+默认一键流程已经包含 **五种方法 × Qwen3-4B/8B × 648 条条件**，新增 10 个评测单元；不需要单独准备 Benchmark 数据。冻结数据直接放在 `vendor/laten/data/`，逐文件校验原始 SHA256，不在目标服务器重新生成题目。
+
+- 162 个基础任务、648 个 BASE/CF 条件、486 个配对；dev 108 条、test 540 条，保留原划分。
+- 原 G4/G5/G6 角色顺序、I3/I6/I9 信息量、LOOKUP/RULE/DERIVE 策略和角色私有事实边界均保留。
+- Receiver 贪心思考上限 2048；正确闭合后，逐位受约束输出事实向量。原 prompt 中“尽量少于 384 tokens”的软要求不改动。
+- 同时报告完整向量、逐事实、确定性动作、冻结模型 A–H 动作诊断、目标 CF、非目标 CF、整对向量、截断数，以及“动作正确时的事实错误率”。
+- 使用原效率聚合器报告整条路径平均/p50/p95 秒数、总时间、任务吞吐率、正确任务吞吐率、推理/答案/强制格式 Token、latent 位置和逻辑通信字节；额外模型动作诊断独立计时。
+- 本 Benchmark 不参与新增训练。test 是项目已使用过的诊断划分，不称为全新未见测试集。
+
+方法保留各自接口：LatentMAS/H2O 使用连续 KV；Hidden 使用“全部历史原始 prompt embeddings + 当前 10 步 latent”；LatCom 在每个接收边用已训练压缩器把上一角色轨迹转为 64 个槽位；Interlat 使用 21 步已训练压缩 Sender 和接收 Adapter，最后使用训练后的 Receiver LM。后两者是明确标记的串行多跳迁移，不能称为作者官方多跳实现。为了延续本 Benchmark 的 10 步 Sender 条件，这里使用 10 步，七个通用数据集仍为 40 步；各方法的消息字节数不是等额预算。详见 [协议](docs/LATEN_BENCHMARK_PROTOCOL.md)。
+
+已有上一版本结果与完整训练权重时，先等正在运行的旧任务结束，然后：
+
+```bash
+git pull --ff-only
+bash run.sh semantic-all
+```
+
+继续设置原有 `LATEN_STORE`。该命令只补测 LATEN，不重新跑七个通用数据集、不训练新权重。仅接受与原版本 `1f98984` 配置吻合且权重哈希正确的完整导出；不在新代码下恢复旧优化器断点。若旧版未完成训练，先在旧版完成；要用新版重新运行整套实验则指定新的 `LATEN_STORE`，避免旧源码身份与新源码混用。
+
+可单独测一组，或跑独立的 G4/G5/G6 接口 smoke：
+
+```bash
+bash run.sh semantic --family 4b --method latentmas_hidden
+bash run.sh semantic-smoke --family 4b --method latcom
+```
+
+正式语义结果在 `storage/runs/<规模>/semantic/<方法>/results.jsonl`；smoke 存入 `semantic_smoke/`，不混入正式分母。通用任务大表仍为 `summary.csv`，语义完整大表为 `semantic_summary.csv`，原始分层指标在 `semantic_summary.json`，全套 80 个单元完成情况在 `suite_summary.json`。`SEMANTIC_COMPLETE.json` 表示仅新增 10 个单元完成，`COMPLETE.json` 表示默认全流程完成。
 
 ## 下载与结果位置
 
@@ -107,7 +138,7 @@ bash run.sh status
 下面这些命令用于排查或分段调度，**一次只运行一个 GPU 命令**：
 
 ```bash
-bash run.sh validate                          # 无需 GPU/下载，8 项本地协议检查
+bash run.sh validate                          # 无需 GPU/下载，16 项本地协议检查
 bash run.sh bootstrap                         # 目标 B200 环境检查与安装
 bash run.sh download                          # 固定版本模型、数据、源码与评分容器
 bash run.sh smoke --family 4b                  # 三个免训练方法的真实模型接口检查
@@ -119,12 +150,12 @@ bash run.sh evaluate --family 4b --method latcom
 bash run.sh report
 ```
 
-Interlat 的阶段键为 `interlat_receiver`、`interlat_compression`。可用 `--config configs/your_config.json` 指定复制后的配置文件。默认全矩阵配置下，只完成 4B 时不会生成完整 70 单元的完成标记。
+Interlat 的阶段键为 `interlat_receiver`、`interlat_compression`。可用 `--config configs/your_config.json` 指定复制后的配置文件。默认全矩阵配置下，只完成 4B 时不会生成完整 80 单元的完成标记。
 
 数值/梯度检查需要已装 torch/transformers 的 Python，但不使用 GPU：
 
 ```bash
-.venv/bin/python -m unittest discover -s tests -p 'test_tiny_cpu.py' -v
+.venv/bin/python -m unittest discover -s tests -p 'test_tiny*.py' -v
 ```
 
 ## 如何读分数、耗时和 Token
@@ -139,4 +170,4 @@ Interlat 的阶段键为 `interlat_receiver`、`interlat_compression`。可用 `
 
 ## 当前验证边界
 
-准备阶段通过 **8 项静态/数据 fixture 检查 + 9 项小型 Qwen3 CPU 数值/梯度检查**，覆盖五种通信路径、H2O 裁剪、对齐向量、冻结 Receiver 的梯度传播和训练/推理自回归一致性。未在准备服务器下载完整模型或启动 GPU 训练，**尚无正式 B200 跑分、端到端 8B 显存峰值或收敛结论**。验证记录见 `evidence/validation.json`。所有大模型检验将由目标服务器脚本实际执行，失败会保留具体记录。
+准备阶段通过 **16 项静态/数据/评分检查 + 12 项小型 Qwen3 CPU 数值/梯度检查**，覆盖五种通信路径、H2O 裁剪、对齐向量、冻结 Receiver 的梯度传播和训练/推理自回归一致性。未在准备服务器下载完整模型或启动 GPU 训练，**尚无正式 B200 跑分、端到端 8B 显存峰值或收敛结论**。验证记录见 `evidence/validation.json`。所有大模型检验将由目标服务器脚本实际执行，失败会保留具体记录。

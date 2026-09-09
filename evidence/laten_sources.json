@@ -1,0 +1,50 @@
+{
+  "schema.py": {
+    "source": "src/latent_audit/semantic_fidelity_v1/schema.py",
+    "source_sha256": "86937129bfd324e7a3fa5888c02d9be139976e0a794746c29d0d20f7448e674a",
+    "change": "byte identical",
+    "source_kind": "existing_authoritative_project_file"
+  },
+  "policy.py": {
+    "source": "src/latent_audit/semantic_fidelity_v1/policy.py",
+    "source_sha256": "30f816c838e74c2df539ff5010006b4b113157f3e18a3032b148f1cb9837a843",
+    "change": "byte identical",
+    "source_kind": "existing_authoritative_project_file"
+  },
+  "prompts.py": {
+    "source": "src/latent_audit/semantic_fidelity_v2/prompts.py",
+    "source_sha256": "e18d90e0bdaa7b694629010e288ebd6a9b23ea09e9d05d53114911eb571217e0",
+    "change": "relative imports only",
+    "source_kind": "existing_authoritative_project_file"
+  },
+  "deliberative_prompts.py": {
+    "source": "src/latent_audit/semantic_fidelity_v2_3/prompts.py",
+    "source_sha256": "ac71f512e0d16f18f21cfcce5d4b8d1173b520584fb721ca4bcface05c92ee7a",
+    "change": "relative imports only",
+    "source_kind": "existing_authoritative_project_file"
+  },
+  "efficiency.py": {
+    "source": "scripts/benchmarkbuild/semantic_receiver_v6_channel_v2/efficiency.py",
+    "source_sha256": "15dd38ab844940ad62550d211617f8674fb088bba1f67ae55c64907360cb764f",
+    "change": "byte identical",
+    "source_kind": "existing_authoritative_project_file"
+  },
+  "summary.py": {
+    "source": "scripts/benchmarkbuild/semantic_receiver_v6_finaleval/run_eval.py",
+    "source_sha256": "844830e2b1deb1378cfa5d5317f822859a3154939c17a13358aeaee9e8fd4b57",
+    "change": "extracted unchanged summarize function",
+    "source_kind": "existing_authoritative_project_file"
+  },
+  "public_context.py": {
+    "source": "scripts/benchmarkbuild/semantic_receiver_v6_channel_v2/channel.py",
+    "source_sha256": "d48d08516c1ece060cff7d18abbf2ee4d666c965d48735923bce36782a914b96",
+    "change": "extracted public-only prompt function and constants",
+    "source_kind": "existing_authoritative_project_file"
+  },
+  "native_reference.py": {
+    "source": "src/latent_audit/semantic_receiver_v4/native.py",
+    "source_sha256": "1ad6516b89b8922731ab34c993f7cff6fcb84d0060609677662053571f515c8a",
+    "change": "original generate method and exception class; minimal test-only dependency shim",
+    "source_kind": "existing_authoritative_project_file"
+  }
+}
