@@ -1,5 +1,7 @@
 # Protocol and evidence boundary
 
+> Current execution revision (2026-09-09): [SAMPLED_PARALLEL_PROTOCOL.md](SAMPLED_PARALLEL_PROTOCOL.md) controls evaluation scheduling and scope. General tasks use fixed ~10% subsets (591 total); LATEN remains full 648/486. Default inference concurrency is two, training stays serial. There are 80 cells / 12,390 evaluated tasks. Older full-general counts and serial timing descriptions below document the source protocol, not the current default execution. New paths: evaluation_sample10 and semantic_parallel.
+
 This is a portable **paper-derived comparison suite**, not a claim of exact author-checkpoint reproduction. It uses Qwen/Qwen3-4B and Qwen/Qwen3-8B (the public chat/thinking releases, pinned commits), not an invented 4B-Base model ID. It runs on one physical B200, with no distributed or multi-GPU fallback.
 
 ## Source audit
@@ -50,4 +52,4 @@ Portable contract tests use local fixtures. Numeric tests use randomly initializ
 
 ## Added project Benchmark
 
-The 70 general-task cells remain intact. The frozen LATEN Benchmark adds 10 cells with 648 variants each, bringing the default run to 80 cells and 65,550 attempts. See [LATEN_BENCHMARK_PROTOCOL.md](LATEN_BENCHMARK_PROTOCOL.md) for immutable data, original prompt/scorer reuse, serial communication adaptations, 2048-token native decoding, efficiency scope and previous-release export compatibility. Its semantic metrics are reported separately from the seven-task macro.
+The 70 general-task cells remain intact. The frozen LATEN Benchmark adds 10 cells with 648 variants each. The original full-general matrix had 65,550 attempts; the current default has 80 cells and 12,390 attempts after general-task sampling. See [LATEN_BENCHMARK_PROTOCOL.md](LATEN_BENCHMARK_PROTOCOL.md) for immutable data, original prompt/scorer reuse, serial communication adaptations, 2048-token native decoding, efficiency scope and previous-release export compatibility. Its semantic metrics are reported separately from the seven-task macro.

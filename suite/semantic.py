@@ -69,4 +69,15 @@ def summarize(rows,variants):
  result['fact_error_given_task_success']={'fact_error_count':errors,'task_success_count':len(successful_actions),'rate':errors/len(successful_actions) if successful_actions else None}
  result['efficiency']=summarize_efficiency(rows,success_field='information_vector_exact',expected_case_count=len(variants))
  result['efficiency_by']={field:{value:summarize_efficiency([r for r in rows if r[field]==value],expected_case_count=sum(getattr(v,field)==value for v in variants)) for value in sorted({getattr(v,field) for v in variants})} for field in ('split','graph_level','information_level')}
+ if any(r.get('execution') for r in rows):
+  groups=[result['efficiency']]+[value for grouped in result['efficiency_by'].values() for value in grouped.values()]
+  for eff in groups:
+   eff['timing_interpretation']='contended_accumulated_task_time_not_parallel_stage_elapsed'
+   for k in ('tasks_per_second','correct_tasks_per_second','seconds_per_correct_task'):
+    if k in eff:eff['diagnostic_from_accumulated_time_'+k]=eff.pop(k)
  return result
+
+
+def selected_frozen(cfg):
+ # User explicitly retains the complete private Benchmark; only general tasks sample.
+ return load_frozen()

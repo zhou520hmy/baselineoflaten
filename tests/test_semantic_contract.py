@@ -47,6 +47,6 @@ class SemanticContract(unittest.TestCase):
   self.assertTrue(found)
  def test_legacy_export_identity_is_config_guarded(self):
   cfg=C.config();prior=C.read(C.ROOT/'evidence/previous_release.json');self.assertIn(prior['identity'],C.compatible_export_identities(cfg));cfg['training']['latcom_stage1_steps']+=1;self.assertNotIn(prior['identity'],C.compatible_export_identities(cfg))
- def test_matrix_is_80_cells_65550_attempts(self):
+ def test_source_matrix_is_80_cells_65550_before_sampling(self):
   cfg=C.config();self.assertEqual(2*5*(len(cfg['datasets'])+1),80);self.assertEqual(2*5*(sum(cfg['datasets'].values())+cfg['semantic_benchmark']['variants']),65550)
 if __name__=='__main__':unittest.main()

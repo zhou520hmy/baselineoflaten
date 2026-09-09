@@ -1,21 +1,28 @@
 {
-  "time_beijing": "2026-09-09T18:46:47+08:00",
-  "validation_type": "local_static_frozen_data_fixtures_and_tiny_CPU_only",
-  "tests_passed": 28,
-  "static_tests": 16,
-  "tiny_cpu_tests": 12,
-  "semantic_graph_path_combinations": 15,
-  "frozen_variants_verified": 648,
-  "frozen_prompt_snapshots_verified": 648,
-  "frozen_pairs_verified": 486,
-  "python": "3.10.12",
-  "torch": "2.5.1+cu121",
-  "transformers": "4.57.6",
+  "time_beijing": "2026-09-09T19:22:17+08:00",
+  "validation_type": "local_static_frozen_data_process_scheduler_and_tiny_CPU_only",
+  "tests_passed": 39,
+  "static_and_scheduler_tests": 25,
+  "tiny_cpu_tests": 14,
+  "general_sample_counts": {
+    "gsm8k": 132,
+    "arc_easy": 238,
+    "arc_challenge": 117,
+    "medqa": 30,
+    "mbppplus": 38,
+    "humanevalplus": 16,
+    "gpqa": 20
+  },
+  "semantic_variants": 648,
+  "semantic_pairs": 486,
+  "expected_cells": 80,
+  "expected_task_evaluations": 12390,
+  "default_inference_workers": 2,
   "cuda_initialized": false,
-  "run_identity": "0505cb9b388747a91792a19841c66ddbbd94718d334c6b655a2848672aeb07bf",
+  "run_identity": "4bec84d50c4f3853381eee107f478570ef00c5b9dc0bd835d3a0d11f6acffa08",
   "full_model_downloaded": false,
   "gpu_training_or_benchmark_run": false,
-  "b200_runtime_verified": false,
+  "b200_parallel_runtime_verified": false,
   "checks": [
     {
       "check": "shell_syntax",
@@ -24,21 +31,21 @@
       "stderr": ""
     },
     {
-      "check": "static_frozen_data_prompts_metrics",
+      "check": "static_sampling_scheduler_and_frozen_data",
       "exit_code": 0,
-      "stdout": "",
-      "stderr": "test_all_seven_schemas_and_training_split (test_data_fixture.DataFixture) ... ok\ntest_648_486_and_exact_dataclass_roundtrip (test_semantic_contract.SemanticContract) ... ok\ntest_all_gold_policy_vectors_and_original_metric_parity (test_semantic_contract.SemanticContract) ... ok\ntest_failed_cf_and_partial_pair_denominators (test_semantic_contract.SemanticContract) ... ok\ntest_legacy_export_identity_is_config_guarded (test_semantic_contract.SemanticContract) ... ok\ntest_matrix_is_80_cells_65550_attempts (test_semantic_contract.SemanticContract) ... ok\ntest_original_648_prompt_snapshots (test_semantic_contract.SemanticContract) ... ok\ntest_receiver_prompt_invariant_under_cf (test_semantic_contract.SemanticContract) ... ok\ntest_wrong_fact_can_preserve_action_conditional_metric (test_semantic_contract.SemanticContract) ... ok\ntest_code (test_static.PortableContract) ... ok\ntest_gold_not_in_engine (test_static.PortableContract) ... ok\ntest_journal_recovery (test_static.PortableContract) ... ok\ntest_matrix_and_pins (test_static.PortableContract) ... ok\ntest_numeric_choice (test_static.PortableContract) ... ok\ntest_portable (test_static.PortableContract) ... ok\ntest_sources_parse (test_static.PortableContract) ... ok\n\n----------------------------------------------------------------------\nRan 16 tests in 1.066s\n\nOK\n"
+      "stdout": "OOM: resuming affected shards serially with saved generations retained\n",
+      "stderr": "test_all_seven_schemas_and_training_split (test_data_fixture.DataFixture) ... ok\ntest_case_shards_keep_pairs_and_all_frozen_rows (test_sampling_parallel.SamplingParallel) ... ok\ntest_counts_full_private_and_balanced_general (test_sampling_parallel.SamplingParallel) ... ok\ntest_empty_reports_use_new_denominators (test_sampling_parallel.SamplingParallel) ... ok\ntest_legacy_export_training_and_output_isolation (test_sampling_parallel.SamplingParallel) ... ok\ntest_merge_partial_tail_and_duplicate_rejection (test_sampling_parallel.SamplingParallel) ... ok\ntest_oom_serial_retry_preserves_completed_shard_and_resume (test_sampling_parallel.SamplingParallel) ... ok\ntest_other_error_not_retried_or_scored (test_sampling_parallel.SamplingParallel) ... ok\ntest_real_process_pool_concurrency_bound (test_sampling_parallel.SamplingParallel) ... ok\ntest_sample_manifest_tamper_and_seed_guard (test_sampling_parallel.SamplingParallel) ... ok\ntest_648_486_and_exact_dataclass_roundtrip (test_semantic_contract.SemanticContract) ... ok\ntest_all_gold_policy_vectors_and_original_metric_parity (test_semantic_contract.SemanticContract) ... ok\ntest_failed_cf_and_partial_pair_denominators (test_semantic_contract.SemanticContract) ... ok\ntest_legacy_export_identity_is_config_guarded (test_semantic_contract.SemanticContract) ... ok\ntest_original_648_prompt_snapshots (test_semantic_contract.SemanticContract) ... ok\ntest_receiver_prompt_invariant_under_cf (test_semantic_contract.SemanticContract) ... ok\ntest_source_matrix_is_80_cells_65550_before_sampling (test_semantic_contract.SemanticContract) ... ok\ntest_wrong_fact_can_preserve_action_conditional_metric (test_semantic_contract.SemanticContract) ... ok\ntest_code (test_static.PortableContract) ... ok\ntest_gold_not_in_engine (test_static.PortableContract) ... ok\ntest_journal_recovery (test_static.PortableContract) ... ok\ntest_matrix_and_pins (test_static.PortableContract) ... ok\ntest_numeric_choice (test_static.PortableContract) ... ok\ntest_portable (test_static.PortableContract) ... ok\ntest_sources_parse (test_static.PortableContract) ... ok\n\n----------------------------------------------------------------------\nRan 25 tests in 6.541s\n\nOK\n"
     },
     {
-      "check": "tiny_CPU_interfaces_gradients_native_parity",
+      "check": "tiny_CPU_interfaces_gradients_and_worker_evaluators",
       "exit_code": 0,
       "stdout": "",
-      "stderr": "test_alignment_actual_inputs (test_tiny_cpu.TinyCPU) ... ok\ntest_frozen_receiver_slot_gradient (test_tiny_cpu.TinyCPU) ... ok\ntest_headwise_selection (test_tiny_cpu.TinyCPU) ... ok\ntest_interlat_recurrence (test_tiny_cpu.TinyCPU) ... ok\ntest_learned_pipelines (test_tiny_cpu.TinyCPU) ... ok\ntest_loss_signs (test_tiny_cpu.TinyCPU) ... ok\ntest_pruned_absolute_positions (test_tiny_cpu.TinyCPU) ... ok\ntest_receiver_and_compression_gradients (test_tiny_cpu.TinyCPU) ... ok\ntest_three_pipelines (test_tiny_cpu.TinyCPU) ... ok\ntest_all_five_methods_all_three_graphs (test_tiny_semantic_cpu.SemanticCPU) ... ok\ntest_compressor_optional_prefix_preserves_original_recurrence (test_tiny_semantic_cpu.SemanticCPU) ... ok\ntest_original_native_decoder_parity_close_eos_cap (test_tiny_semantic_cpu.SemanticCPU) ... ok\n\n----------------------------------------------------------------------\nRan 12 tests in 4.114s\n\nOK\n"
+      "stderr": "test_alignment_actual_inputs (test_tiny_cpu.TinyCPU) ... ok\ntest_frozen_receiver_slot_gradient (test_tiny_cpu.TinyCPU) ... ok\ntest_headwise_selection (test_tiny_cpu.TinyCPU) ... ok\ntest_interlat_recurrence (test_tiny_cpu.TinyCPU) ... ok\ntest_learned_pipelines (test_tiny_cpu.TinyCPU) ... ok\ntest_loss_signs (test_tiny_cpu.TinyCPU) ... ok\ntest_pruned_absolute_positions (test_tiny_cpu.TinyCPU) ... ok\ntest_receiver_and_compression_gradients (test_tiny_cpu.TinyCPU) ... ok\ntest_three_pipelines (test_tiny_cpu.TinyCPU) ... ok\ntest_actual_general_worker_journals_rng_tokens_and_resume (test_tiny_parallel_cpu.WorkerCPU) ... ok\ntest_actual_semantic_worker_whole_pairs_and_resume (test_tiny_parallel_cpu.WorkerCPU) ... ok\ntest_all_five_methods_all_three_graphs (test_tiny_semantic_cpu.SemanticCPU) ... ok\ntest_compressor_optional_prefix_preserves_original_recurrence (test_tiny_semantic_cpu.SemanticCPU) ... ok\ntest_original_native_decoder_parity_close_eos_cap (test_tiny_semantic_cpu.SemanticCPU) ... ok\n\n----------------------------------------------------------------------\nRan 14 tests in 5.355s\n\nOK\n"
     },
     {
-      "check": "80_cell_empty_reporting",
+      "check": "git_diff_whitespace",
       "exit_code": 0,
-      "stdout": "# B200 baseline comparison\nUpdated (Beijing): 2026-09-09T18:46:47+08:00\n\n**Actual portable-suite results; not copied paper scores.** Incomplete denominators are shown explicitly.\n\n## Qwen3-4B\n\n| Method | gsm8k | arc_easy | arc_challenge | medqa | mbppplus | humanevalplus | gpqa | Macro accuracy |\n|---|---|---|---|---|---|---|---|---|\n| latentmas | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| latentmas_h2o | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| latentmas_hidden | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| latcom | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| interlat | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n\n## Qwen3-8B\n\n| Method | gsm8k | arc_easy | arc_challenge | medqa | mbppplus | humanevalplus | gpqa | Macro accuracy |\n|---|---|---|---|---|---|---|---|---|\n| latentmas | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| latentmas_h2o | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| latentmas_hidden | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| latcom | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n| interlat | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Incomplete |\n\n## Training stages\n\n| Family | Stage | State | Step |\n|---|---|---|---|\n| 4b | latcom_stage1 | pending | — |\n| 4b | latcom_stage2 | pending | — |\n| 4b | interlat_receiver | pending | — |\n| 4b | interlat_compression | pending | — |\n| 8b | latcom_stage1 | pending | — |\n| 8b | latcom_stage2 | pending | — |\n| 8b | interlat_receiver | pending | — |\n| 8b | interlat_compression | pending | — |\n\nEfficiency CSV covers every sender and final receiver; setup, training, code judging are excluded from inference time. Generated text tokens, latent positions, prefill and bytes are distinct. GPU scheduling and H2O attention overhead must be retained when comparing these measurements.\n# LATEN Benchmark — frozen 648-variant comparison\n\nUpdated (Beijing): 2026-09-09T18:46:47+08:00\n\nTest split: previously_exposed_test_diagnostic. No new training on this Benchmark.\n\n| Model | Method | Done | Vector | Bits | Functional action | Model action | Target CF | Non-target CF | Both CF vectors | Mean task s |\n|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n| 4b | latentmas | 0/648 | Pending | Pending | Pending | Pending | Pending | Pending | Pending | — |\n| 4b | latentmas_h2o | 0/648 | Pending | Pending | Pending | Pending | Pending | Pending | Pending | — |\n| 4b | latentmas_hidden | 0/648 | Pending | Pending | Pending | Pending | Pending | Pending | Pending | — |\n| 4b | latcom | 0/648 | Pending | Pending | Pending | Pending | Pending | Pending | Pending | — |\n| 4b | interlat | 0/648 | Pending | Pending | Pending | Pending | Pending | Pending | Pending | — |\n| 8b | latentmas | 0/648 | Pending | Pending | Pending | Pending | Pending | Pending | Pending | — |\n| 8b | latentmas_h2o | 0/648 | Pending | Pending | Pending | Pending | Pending | Pending | Pending | — |\n| 8b | latentmas_hidden | 0/648 | Pending | Pending | Pending | Pending | Pending | Pending | Pending | — |\n| 8b | latcom | 0/648 | Pending | Pending | Pending | Pending | Pending | Pending | Pending | — |\n| 8b | interlat | 0/648 | Pending | Pending | Pending | Pending | Pending | Pending | Pending | — |\nOverall: 0/80 completed cells\n",
+      "stdout": "",
       "stderr": ""
     }
   ]

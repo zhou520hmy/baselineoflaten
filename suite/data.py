@@ -95,6 +95,11 @@ def evaluation_items(cfg,task):
  manifest=read(STORE/'data/manifest.json');p=STORE/'data'/(task+'.jsonl')
  if sha(p)!=manifest['files'][p.name]:raise ValueError('Evaluation data hash differs')
  data=rows(p)
- limit=cfg.get('evaluation_limit_per_dataset')
- if limit is not None:data=data[:int(limit)]
- return data
+ from .sampling import select_general,save_selection
+ selected,meta=select_general(data,cfg,task)
+ # Model-independent manifest shared by every method and model.
+ import fcntl
+ with (STORE/'data/sampling.lock').open('a+') as lock:
+  fcntl.flock(lock,fcntl.LOCK_EX)
+  save_selection(STORE,task,selected,meta,{'file':p.name,'sha256':manifest['files'][p.name],'data_identity':manifest['identity']})
+ return selected

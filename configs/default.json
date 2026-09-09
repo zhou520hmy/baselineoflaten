@@ -115,5 +115,16 @@
     "test_scope": "previously_exposed_test_diagnostic",
     "data_root": "vendor/laten/data",
     "reuse_completed_previous_release_exports": true
+  },
+  "evaluation_sampling": {
+    "enabled": true,
+    "fraction": 0.1,
+    "seed": 42,
+    "strategy": "complexity_proxy_terciles_v1"
+  },
+  "inference_parallel": {
+    "workers": 2,
+    "total_allocator_fraction": 0.9,
+    "oom_serial_retry": true
   }
 }

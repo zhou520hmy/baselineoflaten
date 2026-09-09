@@ -1,4 +1,4 @@
-"""One-GPU coordinator; each heavy stage exits before the next starts."""
+"""Single-GPU stages: serial training, bounded parallel evaluation."""
 import argparse,contextlib,fcntl,json,os,shutil,subprocess,sys,time,traceback
 from . import common as C
 
@@ -57,9 +57,9 @@ def downloads(cfg):
  fixture={'test_code':'assert add(2, 3) == 5','dataset':'mbppplus'}
  if not code_score(fixture,'```python\ndef add(a,b): return a+b\n```',cfg)['correct']:raise RuntimeError('Code sandbox positive canary failed')
  if code_score(fixture,'```python\ndef add(a,b): return 0\n```',cfg)['correct']:raise RuntimeError('Code sandbox negative canary failed')
- # Score every supplied canonical solution once before model evaluation. Never drop failing tasks.
+ # Score every selected canonical solution once before model evaluation. Never drop failing tasks.
  from .data import evaluation_items
- refdir=C.STORE/'sandbox/reference_checks';refkey=C.canon({'data':C.read(C.STORE/'data/manifest.json')['identity'],'image':C.read(C.STORE/'sandbox/image.json')['image_id'],'tests':cfg['code_tests']})
+ refdir=C.STORE/('sandbox/reference_checks_sample10' if cfg.get('evaluation_sampling',{}).get('enabled') else 'sandbox/reference_checks');refkey=C.canon({'data':C.read(C.STORE/'data/manifest.json')['identity'],'sampling':cfg.get('evaluation_sampling'),'image':C.read(C.STORE/'sandbox/image.json')['image_id'],'tests':cfg['code_tests']})
  C.seal(refdir,refkey,{'purpose':'validate_expanded_test_execution_not_model_evaluation'})
  checked={r['example_id'] for r in C.rows(refdir/'results.jsonl',repair=True) if r['correct']}
  for task in ('mbppplus','humanevalplus'):
@@ -78,7 +78,7 @@ def child(action,cfg_path,*extra):
  return subprocess.run(command,cwd=C.ROOT).returncode
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('action',choices=['all','preflight-host','_doctor','download','collect','train','evaluate','semantic','semantic-all','semantic-smoke','smoke','report','status']);p.add_argument('--config',default=str(C.ROOT/'configs/default.json'));p.add_argument('--family',choices=['4b','8b']);p.add_argument('--method',choices=['latentmas','latentmas_h2o','latentmas_hidden','latcom','interlat']);p.add_argument('--stage',choices=['latcom_stage1','latcom_stage2','interlat_receiver','interlat_compression']);a=p.parse_args();cfg=C.config(a.config);C.STORE.mkdir(parents=True,exist_ok=True)
+ p=argparse.ArgumentParser();p.add_argument('action',choices=['all','preflight-host','_doctor','download','collect','train','evaluate','semantic','semantic-all','eval-all','semantic-smoke','smoke','report','status']);p.add_argument('--config',default=str(C.ROOT/'configs/default.json'));p.add_argument('--family',choices=['4b','8b']);p.add_argument('--method',choices=['latentmas','latentmas_h2o','latentmas_hidden','latcom','interlat']);p.add_argument('--stage',choices=['latcom_stage1','latcom_stage2','interlat_receiver','interlat_compression']);a=p.parse_args();cfg=C.config(a.config);C.STORE.mkdir(parents=True,exist_ok=True)
  if a.action=='preflight-host':print(json.dumps(host_checks()));return
  if a.action=='_doctor':doctor();return
  if a.action in ('status','report'):
@@ -93,6 +93,10 @@ def main():
   from .train import train_stage
   if not a.family or not a.stage:p.error('--family and --stage required')
   train_stage(a.family,a.stage,cfg);return
+ if a.action in ('evaluate','semantic') and not os.environ.get('LATEN_INFERENCE_WORKER'):
+  from .parallel import parallel_evaluate
+  if not a.family or not a.method:p.error('--family and --method required')
+  parallel_evaluate(a.action,a.family,a.method,cfg,__import__('pathlib').Path(a.config).resolve());return
  if a.action=='evaluate':
   from .evaluate import evaluate
   if not a.family or not a.method:p.error('--family and --method required')
@@ -105,13 +109,14 @@ def main():
  lock=C.STORE/'run.lock'
  with lock.open('a+') as f:
   fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB);host=C.STORE/'environment/host.json';C.write(host,host_checks())
-  cfg_path=__import__('pathlib').Path(a.config).resolve();key=C.identity(cfg);C.seal(C.STORE/('semantic_run_identity' if a.action=='semantic-all' else 'run_identity'),key,{'config':cfg})
+  cfg_path=__import__('pathlib').Path(a.config).resolve();key=C.identity(cfg);C.seal(C.STORE/('sampled_eval_run_identity' if a.action=='eval-all' else 'semantic_parallel_run_identity' if a.action=='semantic-all' else 'run_identity'),key,{'config':cfg})
   if child('_doctor',cfg_path)!=0:raise RuntimeError('B200 environment validation failed')
   if a.action!='semantic-all' and child('download',cfg_path)!=0:raise RuntimeError('Download/setup failed')
   from .report import report
   for family in ([a.family] if a.family else cfg['families']):
-   if a.action=='semantic-all':
+   if a.action in ('semantic-all','eval-all'):
     for method in cfg['methods']:
+     if a.action=='eval-all' and child('evaluate',cfg_path,'--family',family,'--method',method):raise RuntimeError('General evaluation stopped; saved progress retained')
      rc=child('semantic',cfg_path,'--family',family,'--method',method);report(cfg,False)
      if rc:raise RuntimeError(f'{family}/{method} semantic evaluation stopped; saved progress retained')
     continue
@@ -138,8 +143,10 @@ def main():
     if cfg.get('semantic_benchmark',{}).get('enabled') and child('semantic',cfg_path,'--family',family,'--method',method):raise RuntimeError('Semantic evaluation stopped; saved progress retained')
   complete=report(cfg)
   if a.action=='semantic-all' and C.read(C.STORE/'reports/semantic_summary.json')['complete']:C.write(C.STORE/'SEMANTIC_COMPLETE.json',{'identity':key,'completed_cells':len(cfg['families'])*len(cfg['methods']),'time':C.now()})
-  if a.action=='all' and complete:C.write(C.STORE/'COMPLETE.json',{'identity':key,'completed_cells':len(cfg['families'])*len(cfg['methods'])*(len(cfg['datasets'])+int(cfg.get('semantic_benchmark',{}).get('enabled',False))),'time':C.now()})
+  if a.action in ('all','eval-all') and complete:C.write(C.STORE/'COMPLETE.json',{'identity':key,'completed_cells':len(cfg['families'])*len(cfg['methods'])*(len(cfg['datasets'])+int(cfg.get('semantic_benchmark',{}).get('enabled',False))),'time':C.now()})
 if __name__=='__main__':
  try:main()
  except Exception as e:
-  C.write(C.STORE/'last_error.json',{'type':type(e).__name__,'error':str(e),'time':C.now(),'benchmark_failure_score':False});traceback.print_exc();sys.exit(1)
+  oom=type(e).__name__=='OutOfMemoryError' or ('out of memory' in str(e).lower() and 'cuda' in str(e).lower())
+  path=C.STORE/('worker_errors/'+str(os.getpid())+'.json' if os.environ.get('LATEN_INFERENCE_WORKER') else 'last_error.json')
+  C.write(path,{'type':type(e).__name__,'error':str(e),'time':C.now(),'benchmark_failure_score':False,'cuda_oom':oom});traceback.print_exc();sys.exit(86 if oom else 1)

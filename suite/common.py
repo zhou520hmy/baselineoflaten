@@ -53,7 +53,10 @@ def model_path(family):return STORE/'models'/family
 def stage_dir(family,stage):return STORE/'runs'/family/'training'/stage
 
 def compatible_export_identities(cfg):
- current=identity(cfg);allowed={current};previous=read(ROOT/'evidence/previous_release.json')
- if cfg.get('semantic_benchmark',{}).get('reuse_completed_previous_release_exports') and previous and {k:v for k,v in cfg.items() if k!='semantic_benchmark'}==previous['config']:
-  allowed.add(previous['identity'])
+ current=identity(cfg);allowed={current}
+ def training_config(c):return {k:v for k,v in c.items() if k not in ('semantic_benchmark','evaluation_sampling','inference_parallel')}
+ if cfg.get('semantic_benchmark',{}).get('reuse_completed_previous_release_exports'):
+  for filename in ('previous_release.json','previous_full_release.json'):
+   previous=read(ROOT/'evidence'/filename)
+   if previous and training_config(cfg)==training_config(previous['config']):allowed.add(previous['identity'])
  return allowed
