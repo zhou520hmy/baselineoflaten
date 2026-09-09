@@ -1,0 +1,106 @@
+{
+  "Qwen/Qwen3-4B": {
+    "kind": "models",
+    "sha": "1cfa9a7208912126459214e8b04321603b3df60c",
+    "files": [
+      "config.json",
+      "generation_config.json",
+      "model.safetensors.index.json",
+      "tokenizer.json",
+      "tokenizer_config.json",
+      "vocab.json"
+    ]
+  },
+  "Qwen/Qwen3-8B": {
+    "kind": "models",
+    "sha": "b968826d9c46dd6066d109eabc6255188de91218",
+    "files": [
+      "config.json",
+      "generation_config.json",
+      "model.safetensors.index.json",
+      "tokenizer.json",
+      "tokenizer_config.json",
+      "vocab.json"
+    ]
+  },
+  "openai/gsm8k": {
+    "kind": "datasets",
+    "sha": "740312add88f781978c0658806c59bc2815b9866",
+    "files": [
+      "main/test-00000-of-00001.parquet",
+      "main/train-00000-of-00001.parquet",
+      "socratic/test-00000-of-00001.parquet",
+      "socratic/train-00000-of-00001.parquet"
+    ]
+  },
+  "allenai/ai2_arc": {
+    "kind": "datasets",
+    "sha": "210d026faf9955653af8916fad021475a3f00453",
+    "files": [
+      "ARC-Challenge/test-00000-of-00001.parquet",
+      "ARC-Challenge/train-00000-of-00001.parquet",
+      "ARC-Challenge/validation-00000-of-00001.parquet",
+      "ARC-Easy/test-00000-of-00001.parquet",
+      "ARC-Easy/train-00000-of-00001.parquet",
+      "ARC-Easy/validation-00000-of-00001.parquet"
+    ]
+  },
+  "fingertap/GPQA-Diamond": {
+    "kind": "datasets",
+    "sha": "68be7564497676e07a77a042fdb587deb88c51c3",
+    "files": [
+      "dataset_dict.json",
+      "test/gpqa_diamond.parquet"
+    ]
+  },
+  "hotpotqa/hotpot_qa": {
+    "kind": "datasets",
+    "sha": "1908d6afbbead072334abe2965f91bd2709910ab",
+    "files": [
+      "distractor/train-00000-of-00002.parquet",
+      "distractor/train-00001-of-00002.parquet",
+      "distractor/validation-00000-of-00001.parquet",
+      "fullwiki/test-00000-of-00001.parquet",
+      "fullwiki/train-00000-of-00002.parquet",
+      "fullwiki/train-00001-of-00002.parquet",
+      "fullwiki/validation-00000-of-00001.parquet"
+    ]
+  },
+  "dgslibisey/MuSiQue": {
+    "kind": "datasets",
+    "sha": "c8f4f8c9465fb69d31a8eae894c3fd509c4ca321",
+    "files": [
+      "musique_ans_v1.0_dev.jsonl",
+      "musique_ans_v1.0_train.jsonl"
+    ]
+  },
+  "google-research-datasets/mbpp": {
+    "kind": "datasets",
+    "sha": "4bb6404fdc6cacfda99d4ac4205087b89d32030c",
+    "files": [
+      "full/prompt-00000-of-00001.parquet",
+      "full/test-00000-of-00001.parquet",
+      "full/train-00000-of-00001.parquet",
+      "full/validation-00000-of-00001.parquet",
+      "sanitized/prompt-00000-of-00001.parquet",
+      "sanitized/test-00000-of-00001.parquet",
+      "sanitized/train-00000-of-00001.parquet",
+      "sanitized/validation-00000-of-00001.parquet"
+    ]
+  },
+  "evalplus/mbppplus": {
+    "kind": "datasets",
+    "sha": "b2d74c91837c3f2a20c1299ae98133cbe7cfa077",
+    "files": [
+      "data/test-00000-of-00001-d5781c9c51e02795.parquet"
+    ]
+  },
+  "evalplus/humanevalplus": {
+    "kind": "datasets",
+    "sha": "d32357cf319e50e9c8d8dab5ea876c72b0fd321b",
+    "files": [
+      "data/test-00000-of-00001-5973903632b82d40.parquet",
+      "test.jsonl"
+    ]
+  }
+}

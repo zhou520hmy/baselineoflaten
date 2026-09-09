@@ -1,0 +1,6 @@
+{
+  "source": "Gen-Verse/LatentMAS bundled data/medqa.json; local assets checkout",
+  "count": 300,
+  "sha256": "d4f09708b623a7750013b22c607495eb8872bbef7a3f50990b7279c8fd87ec8d",
+  "split": "300-question AgentFlow-derived evaluation subset, not complete official MedQA test"
+}

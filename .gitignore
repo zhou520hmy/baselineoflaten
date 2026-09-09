@@ -1,0 +1,25 @@
+# Downloaded assets and local execution state
+/storage/
+/.venv/
+/logs/
+/run.log
+# Archives are delivered separately, not duplicated in source history
+/*.tar.gz
+/*.tar.gz.sha256
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+configs/local*.json
+*.pem
+*.key
+# Python and editor state
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.vscode/
+.idea/
+.DS_Store
+
+# Local upload tooling and login state
+/.local-tools/
