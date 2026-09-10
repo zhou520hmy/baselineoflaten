@@ -14,12 +14,20 @@ bash run.sh
 GPU_ID=0 LATEN_STORE=/data/laten_baselines bash run.sh
 ```
 
-已有旧版完整训练权重，等旧任务结束再更新，仅运行新版测评：
+2026-09-10 已修复 collect 的控制符误判，拆分 LatCom/Interlat 收集门槛，并保留已完成免训练评测的续跑能力。远端旧任务停止后：
 
 ```bash
 git pull --ff-only
-LATEN_STORE=/data/laten_baselines bash run.sh eval-all
+GPU_ID=3 LATEN_STORE=/data/laten_baselines bash run_remaining.sh --family 4b
 ```
+
+另一张卡明确选择 8B（目录名不决定模型）：
+
+```bash
+GPU_ID=5 LATEN_STORE=/data/laten_baselines_8b bash run_remaining.sh --family 8b
+```
+
+也可不指定 `--family`，单卡依次跑两种规模。继续使用原运行配置；自定义过配置时传 `--config`。[收集修复、证据边界和续跑细节](docs/COLLECT_REPAIR.md)。旧结果身份不匹配会保留并报错，不自动混入。训练前需留足断点空间；报告中的 90 GiB 空闲不足以安全训练 8B。
 
 目标环境：空闲 B200（至少 170 GiB）、Python 3.10–3.12、Git、Docker、至少 256 GB 主机内存和首次运行 500 GiB 空闲磁盘。脚本固定下载版本和路径，支持断点恢复；双进程显存不足时保留结果，自动串行重试受影响分片。
 

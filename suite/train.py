@@ -28,16 +28,19 @@ def load_export(family,stage,cfg,device='cuda:0'):
  return frozen(obj)
 
 def train_stage(family,stage,cfg):
- C.install_signals();directory=C.stage_dir(family,stage);run_identity=C.identity(cfg);cache=C.STORE/'runs'/family/'training_cache';cachemeta=C.read(cache/'complete.json')
+ C.install_signals();directory=C.stage_dir(family,stage);run_identity=C.identity(cfg);cache=C.cache_dir(family);cachemeta=C.read(cache/'complete.json')
  if not cachemeta:raise RuntimeError('Training cache collection is incomplete')
  key=C.canon({'run':run_identity,'family':family,'stage':stage,'cache':cachemeta['identity']});C.seal(directory,key,{'stage':stage,'family':family,'run_identity':run_identity})
  if C.read(directory/'complete.json'):return
- records=[r for r in C.rows(cache/'records.jsonl') if r['status']=='retained' and (stage!='latcom_stage1' or not r['aux'])]
+ from .collection_policy import stage_records
+ records=stage_records(C.rows(cache/'records.jsonl'),stage,cfg['training']['minimum_retained'])
  if len(records)<2:raise ValueError('Need at least two distinct matched/mismatched examples')
  for r in records:
   if C.sha(cache/r['file'])!=r['sha256']:raise ValueError('Training cache corrupt')
  tr=cfg['training'];steps=tr[stage+'_steps'];batch=tr['latcom_global_batch'] if stage.startswith('latcom') else tr[stage+'_global_batch'];device='cuda:0'
  random.seed(cfg['seed']);torch.manual_seed(cfg['seed']);torch.cuda.manual_seed_all(cfg['seed']);torch.backends.cuda.matmul.allow_tf32=False
+ from .disk_budget import check_training_space
+ check_training_space(family,stage,cfg)
  student=build_module(family,stage,cfg);gradient_setup(student)
  if stage=='latcom_stage2' and not (directory/'latest.pt').exists():
   previous=C.stage_dir(family,'latcom_stage1');meta=C.read(previous/'complete.json')

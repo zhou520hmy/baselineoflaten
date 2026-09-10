@@ -17,7 +17,7 @@ mkdir -p "$TMPDIR"
 export PYTHONDONTWRITEBYTECODE=1 TOKENIZERS_PARALLELISM=false OMP_NUM_THREADS=4
 ACTION="${1:-all}"; if (($#)); then shift; fi
 if [[ "$ACTION" == validate ]]; then
-  exec "${PYTHON_BIN:-python3}" -c "import unittest,sys; s=unittest.defaultTestLoader.discover('tests',pattern='test_[sd]*.py'); assert s.countTestCases()>=25, 'Missing tests'; sys.exit(not unittest.TextTestRunner(verbosity=2).run(s).wasSuccessful())"
+  exec "${PYTHON_BIN:-python3}" -c "import unittest,sys; s=unittest.defaultTestLoader.discover('tests',pattern='test_[sd]*.py'); assert s.countTestCases()>=33, 'Missing tests'; sys.exit(not unittest.TextTestRunner(verbosity=2).run(s).wasSuccessful())"
 fi
 if [[ "$ACTION" == status || "$ACTION" == report ]]; then
   exec "${PYTHON_BIN:-python3}" -m suite.cli "$ACTION" "$@"

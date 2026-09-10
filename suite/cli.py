@@ -15,7 +15,7 @@ def host_checks(require_idle=True):
   process=C.run(['nvidia-smi','--query-compute-apps=gpu_uuid,pid','--format=csv,noheader,nounits'],capture_output=True,text=True)
   if int(row[3])>=1024 or int(row[4])>0 or any(x.split(',')[0].strip()==row[6] for x in process.stdout.splitlines()):raise RuntimeError('Selected B200 is in use; no jobs will be terminated')
  free=shutil.disk_usage(C.STORE).free/2**30
- required_disk=150 if (C.STORE/'run_identity/manifest.json').exists() else 500
+ required_disk=150 if any((C.STORE/name/'manifest.json').exists() for name in ('run_identity','collection_v2_run_identity')) else 500
  if free<required_disk:raise RuntimeError(f'Need at least {required_disk} GiB free in LATEN_STORE; found {free:.1f}')
  meminfo=dict(line.split(':',1) for line in open('/proc/meminfo'));memory=int(meminfo['MemTotal'].split()[0])/2**20
  if memory<240:raise RuntimeError(f'Full 8B optimization/resume needs about 256 GB host RAM; found {memory:.1f} GiB')
@@ -78,7 +78,7 @@ def child(action,cfg_path,*extra):
  return subprocess.run(command,cwd=C.ROOT).returncode
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('action',choices=['all','preflight-host','_doctor','download','collect','train','evaluate','semantic','semantic-all','eval-all','semantic-smoke','smoke','report','status']);p.add_argument('--config',default=str(C.ROOT/'configs/default.json'));p.add_argument('--family',choices=['4b','8b']);p.add_argument('--method',choices=['latentmas','latentmas_h2o','latentmas_hidden','latcom','interlat']);p.add_argument('--stage',choices=['latcom_stage1','latcom_stage2','interlat_receiver','interlat_compression']);a=p.parse_args();cfg=C.config(a.config);C.STORE.mkdir(parents=True,exist_ok=True)
+ p=argparse.ArgumentParser();p.add_argument('action',choices=['all','_smoke_one','preflight-host','_doctor','download','collect','train','evaluate','semantic','semantic-all','eval-all','semantic-smoke','smoke','report','status']);p.add_argument('--config',default=str(C.ROOT/'configs/default.json'));p.add_argument('--family',choices=['4b','8b']);p.add_argument('--method',choices=['latentmas','latentmas_h2o','latentmas_hidden','latcom','interlat']);p.add_argument('--stage',choices=['latcom_stage1','latcom_stage2','interlat_receiver','interlat_compression']);a=p.parse_args();cfg=C.config(a.config);C.STORE.mkdir(parents=True,exist_ok=True)
  if a.action=='preflight-host':print(json.dumps(host_checks()));return
  if a.action=='_doctor':doctor();return
  if a.action in ('status','report'):
@@ -97,6 +97,10 @@ def main():
   from .parallel import parallel_evaluate
   if not a.family or not a.method:p.error('--family and --method required')
   parallel_evaluate(a.action,a.family,a.method,cfg,__import__('pathlib').Path(a.config).resolve());return
+ if a.action=='_smoke_one':
+  from .evaluate import evaluate
+  if not a.family or not a.method:p.error('--family and --method required')
+  evaluate(a.family,a.method,cfg,smoke=True);return
  if a.action=='evaluate':
   from .evaluate import evaluate
   if not a.family or not a.method:p.error('--family and --method required')
@@ -105,11 +109,11 @@ def main():
   from .evaluate_semantic import evaluate_semantic
   if not a.family or not a.method:p.error('--family and --method required')
   evaluate_semantic(a.family,a.method,cfg,smoke=a.action=='semantic-smoke');return
- # Single coordinator owns a store lock; no simultaneous model stages.
+ # One coordinator owns the store; inference workers are managed inside each stage.
  lock=C.STORE/'run.lock'
  with lock.open('a+') as f:
   fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB);host=C.STORE/'environment/host.json';C.write(host,host_checks())
-  cfg_path=__import__('pathlib').Path(a.config).resolve();key=C.identity(cfg);C.seal(C.STORE/('sampled_eval_run_identity' if a.action=='eval-all' else 'semantic_parallel_run_identity' if a.action=='semantic-all' else 'run_identity'),key,{'config':cfg})
+  cfg_path=__import__('pathlib').Path(a.config).resolve();key=C.identity(cfg);C.seal(C.STORE/('sampled_eval_v2_run_identity' if a.action=='eval-all' else 'semantic_collect_v2_run_identity' if a.action=='semantic-all' else 'collection_v2_run_identity'),key,{'config':cfg})
   if child('_doctor',cfg_path)!=0:raise RuntimeError('B200 environment validation failed')
   if a.action!='semantic-all' and child('download',cfg_path)!=0:raise RuntimeError('Download/setup failed')
   from .report import report
@@ -120,29 +124,20 @@ def main():
      rc=child('semantic',cfg_path,'--family',family,'--method',method);report(cfg,False)
      if rc:raise RuntimeError(f'{family}/{method} semantic evaluation stopped; saved progress retained')
     continue
+   if a.action=='all':continue
    # Short real-model interface checks; separate directory, never counted as benchmark scores.
    for method in ('latentmas','latentmas_h2o','latentmas_hidden'):
     command=[sys.executable,'-c','from suite.common import config; from suite.evaluate import evaluate; import sys; evaluate(sys.argv[1],sys.argv[2],config(sys.argv[3]),smoke=True)',family,method,str(cfg_path)]
     if subprocess.run(command,cwd=C.ROOT).returncode:raise RuntimeError('Real-model interface smoke failed: '+method)
    if a.action=='smoke':continue
-   for method in ('latentmas','latentmas_h2o','latentmas_hidden'):
-    if method not in cfg['methods']:continue
-    rc=child('evaluate',cfg_path,'--family',family,'--method',method);report(cfg,False)
-    if rc:raise RuntimeError(f'{family}/{method} stopped with code {rc}; saved results retained')
-    if cfg.get('semantic_benchmark',{}).get('enabled') and child('semantic',cfg_path,'--family',family,'--method',method):raise RuntimeError('Semantic evaluation stopped; saved progress retained')
-   if any(m in cfg['methods'] for m in ('latcom','interlat')):
-    rc=child('collect',cfg_path,'--family',family)
-    if rc:raise RuntimeError('Training data collection stopped; saved progress retained')
-   for method,stages in [('latcom',('latcom_stage1','latcom_stage2')),('interlat',('interlat_receiver','interlat_compression'))]:
-    if method not in cfg['methods']:continue
-    for stage in stages:
-     rc=child('train',cfg_path,'--family',family,'--stage',stage);report(cfg,False)
-     if rc:raise RuntimeError(f'{family}/{stage} stopped with code {rc}; checkpoint retained')
-    rc=child('evaluate',cfg_path,'--family',family,'--method',method);report(cfg,False)
-    if rc:raise RuntimeError(f'{family}/{method} stopped; saved generations/results retained')
-    if cfg.get('semantic_benchmark',{}).get('enabled') and child('semantic',cfg_path,'--family',family,'--method',method):raise RuntimeError('Semantic evaluation stopped; saved progress retained')
+   # Full scheduling occurs once below, not once per family in this setup loop.
+  failures=[]
+  if a.action=='all':
+   from .schedule import run_remaining
+   failures=run_remaining([a.family] if a.family else list(cfg['families']),cfg['methods'],cfg.get('semantic_benchmark',{}).get('enabled',False),lambda action,*extra:child(action,cfg_path,*extra),lambda:report(cfg,False))
   complete=report(cfg)
   if a.action=='semantic-all' and C.read(C.STORE/'reports/semantic_summary.json')['complete']:C.write(C.STORE/'SEMANTIC_COMPLETE.json',{'identity':key,'completed_cells':len(cfg['families'])*len(cfg['methods']),'time':C.now()})
+  if failures:raise RuntimeError(f'{len(failures)} branches blocked; independent branches were attempted. See branch_failures.jsonl and reports.')
   if a.action in ('all','eval-all') and complete:C.write(C.STORE/'COMPLETE.json',{'identity':key,'completed_cells':len(cfg['families'])*len(cfg['methods'])*(len(cfg['datasets'])+int(cfg.get('semantic_benchmark',{}).get('enabled',False))),'time':C.now()})
 if __name__=='__main__':
  try:main()

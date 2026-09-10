@@ -59,7 +59,7 @@ nohup bash run.sh > run.log 2>&1 &
 
 ## 训练与通信协议
 
-主训练数据仍是 HotpotQA distractor train / MuSiQue-Ans train：扫描 1,024 个候选，最多保留 512 个主样本，辅助 GSM8K train、排除测试 task ID 的 MBPP train 各 32 条。过滤问题独立可解或完整 latent 路径仍不能回答的主样本，最少保留 32 条，否则明确停止。rationale 利用支持事实和 gold answer 构造，没有额外独立模型或人工验证。LATEN 不进入训练。
+主训练数据仍是 HotpotQA distractor train / MuSiQue-Ans train：扫描 1,024 个候选，最多保留 512 个主样本，辅助 GSM8K train、排除测试 task ID 的 MBPP train 各 32 条。LatCom 主样本排除仅问题可解或单源完整 latent 不可解的题目；Interlat 主样本独立要求带证据的文本计划能正确回答。每个方法至少保留 32 条合格主样本，辅助样本不能满足门槛。某方法不满足条件时记录阻塞并继续独立方法/模型规模。rationale 利用支持事实和 gold answer 构造，没有额外独立模型或人工验证。LATEN 不进入训练。
 
 每种模型四阶段各 300 optimizer steps：LatCom 阶段一和二 global batch 64；Interlat 接收端 global batch 16；Interlat 压缩端 global batch 4。共 2,400 optimizer steps。保持原任务 CE、对比分离、教师分布和表示对齐等目标，具体公式见方法协议。microbatch 1、梯度累积/检查点、FP32 可训练参数和 BF16 autocast，默认 CPU 保存激活；每 25 步保存断点，完整导出 BF16 权重后默认删除最终优化器断点。不是 LoRA 替代实现，不保证默认预算收敛。
 
@@ -73,26 +73,36 @@ Sender 轨迹深度仍为 10（Interlat 使用其训练后的 21 步接口），
 
 LatentMAS/H2O 传递历史 KV；Hidden 传递所有历史原始 prompt embeddings + 当前角色 10 步 latent；LatCom 在各接收边压缩为 64 槽位；Interlat 使用已训练压缩 Sender、接收 Adapter 和最终 Receiver LM。后两者是明确标记的非官方多跳迁移。细节见 [LATEN 协议](docs/LATEN_BENCHMARK_PROTOCOL.md)。
 
-## 更新与旧权重复用
+## collect 修复与未完成部分续跑
 
-旧任务仍在运行时先等它结束。已有完整训练权重时更新代码并只测评：
+2026-09-10 修复了 `Answer: Paris<|im_end|>` 被错误拒绝的问题。完整 latent 过滤改为与第一阶段训练完全一致的 `[single_gold_Z; q]`；Interlat 使用独立的、答案已验证的带证据文本计划门槛。每个过滤记录保存原始输出、解析答案、gold、停止原因和独立门槛判断，不通过简单放行来凑足样本。详见 [修复说明](docs/COLLECT_REPAIR.md)。
+
+旧任务停止、磁盘足够后更新：
 
 ```bash
 git pull --ff-only
-LATEN_STORE=/data/laten_baselines bash run.sh eval-all
+GPU_ID=3 LATEN_STORE=/data/laten_baselines bash run_remaining.sh --family 4b
 ```
 
-`eval-all` 不训练，使用已完成的导出；接受已知旧版 `1f98984`、`4af7b41` 的严格配置/身份匹配和权重 SHA 校验。缺少完整导出会报错。旧优化器断点不在新代码下恢复；要重新训练整套使用新的 `LATEN_STORE`。
-
-只运行全量 LATEN：`bash run.sh semantic-all`。单个方法：
+第二张卡明确选择 8B：
 
 ```bash
-bash run.sh evaluate --family 4b --method latcom
-bash run.sh semantic --family 4b --method latentmas_hidden
-bash run.sh semantic-smoke --family 4b --method latcom
+GPU_ID=5 LATEN_STORE=/data/laten_baselines_8b bash run_remaining.sh --family 8b
 ```
 
-新通用结果在 `runs/<模型>/evaluation_sample10/<方法>/`，全量 LATEN 新并行结果在 `runs/<模型>/semantic_parallel/<方法>/`。旧 `evaluation/`、`semantic/` 原始结果不覆盖；`reports/` 更新为当前配置汇总。分片日志在各方法目录的 `logs/`，分片原始数据在 `shards/0/`、`shards/1/`，根目录 `results.jsonl` 是协调器合并后的当前结果。
+原来单卡执行两种规模时，直接 `bash run_remaining.sh` 即可。目录叫 `_8b` 不会自动选择模型。两次运行不要共享同一个 STORE；若共用磁盘分区，需同时预算两份训练峰值，建议先留出 400–500 GiB 空间。每个训练阶段会按实际模型文件大小检查新旧优化器断点共存空间，90 GiB 不足以安全训练 8B；不会自动删除数据。
+
+使用原 `LATEN_STORE` 和原配置（自定义配置用 `--config`）。下载的模型和原数据复用，已完成的三个免训练基线在校验完整身份/固定分片后跳过；未完成的推理分片继续。对于未经核验的远端代码变更，身份不匹配会报错并保留旧数据，不能把配置不一致的分数自动混合。
+
+原失败 `training_cache/` 保留，新的收集日志/资产位于 `training_cache_v2/`；新训练位于 `training_collect_v2/`。旧过滤记录没有原始生成文本，必须重新采集才能检验修正后的匹配，不能直接把旧失败状态改为通过。新 LatCom/Interlat 评测目录分别是 `evaluation_sample10_collect_v2/` 和 `semantic_parallel_collect_v2/`；三个免训练方法继续沿用 `evaluation_sample10/`、`semantic_parallel/`。旧优化器和已训练导出不自动迁入新训练方案。
+
+每个方法目录下 `shards/` 保存独立原始输出，协调器合并为根部 `results.jsonl`。单个方法/家族失败写入 `branch_failures.jsonl`，其他独立分支仍尝试运行；存在失败时全流程最终返回非零状态，不会宣称全套完成。新版训练完成后，`bash run.sh eval-all` 可单独续测；`bash run.sh status` 查看完整 80 单元。
+
+单独排查收集（需要已安装环境和下载数据）：
+
+```bash
+GPU_ID=3 LATEN_STORE=/data/laten_baselines bash run.sh collect --family 4b
+```
 
 ## Token、时间和结果读取
 
@@ -102,7 +112,7 @@ bash run.sh semantic-smoke --family 4b --method latcom
 
 耗时只作有争用条件下的诊断，不据此宣称独占 GPU 速度优劣；多个任务耗时相加是重叠任务的累计秒数，不是整阶段历时。各阶段 `scheduler_wall.jsonl` 额外保存包含加载、评分和重试的协调器历时。每行 `execution` 标记并发上限、分片和重试模式。OOM/下载/容器基础设施错误保持未评分，正常错误答案、代码测试不通过、原生推理截断按既定规则计分。
 
-重复 `bash run.sh` 续跑相同新版配置；已评分跳过、已生成沿用，训练从合法断点恢复。模型在 `storage/models/`，缓存 `storage/cache/`，数据 `storage/data/`，训练 `storage/runs/<模型>/training/`；环境 `.venv/`。Docker 镜像按宿主 daemon 的存储位置管理。
+重复 `bash run.sh` 续跑相同新版配置；已评分跳过、已生成沿用，训练从合法断点恢复。模型在 `storage/models/`，缓存 `storage/cache/`，数据 `storage/data/`，训练 `storage/runs/<模型>/training_collect_v2/`；环境 `.venv/`。Docker 镜像按宿主 daemon 的存储位置管理。
 
 ## 本地验证边界
 

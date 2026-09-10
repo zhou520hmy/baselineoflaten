@@ -2,7 +2,7 @@
 import contextlib, fcntl, json, os, signal, subprocess, sys, time
 from pathlib import Path
 from . import common as C
-from .sampling import output_kind
+from .sampling import method_output_kind,output_kind
 
 OOM_EXIT=86
 
@@ -99,14 +99,14 @@ def parallel_evaluate(action,family,method,cfg,cfg_path):
  C.install_signals();count=int(cfg.get('inference_parallel',{}).get('workers',1))
  if count not in (1,2):raise ValueError('This B200 profile supports one or two inference workers')
  kind='evaluation' if action=='evaluate' else 'semantic'
- directory=C.STORE/'runs'/family/output_kind(cfg,kind)/method
+ directory=C.STORE/'runs'/family/method_output_kind(cfg,kind,method)/method
  if action=='evaluate':
   from .data import evaluation_items
   items=[r for task in cfg['datasets'] for r in evaluation_items(cfg,task)];allowed=[r['example_id'] for r in items];id_field='example_id'
  else:
   from .semantic import selected_frozen
   variants,_,_,_=selected_frozen(cfg);allowed=[v.variant_id for v in variants];id_field='variant_id'
- key=C.canon({'run':C.identity(cfg),'family':family,'method':method,'action':action,'ids':allowed,'shards':count})
+ key=C.canon({'run':C.evaluation_identity(cfg,method),'family':family,'method':method,'action':action,'ids':allowed,'shards':count})
  C.seal(directory,key,{'family':family,'method':method,'expected':len(allowed),'shards':count,'sampled':action=='evaluate' and bool(cfg.get('evaluation_sampling',{}).get('enabled'))})
  # Single writer even for manually invoked evaluation; do not race repairs/merges.
  with (directory/'coordinator.lock').open('a+') as lock:

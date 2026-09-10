@@ -2,14 +2,14 @@
 import csv,io
 from . import common as C
 from .semantic import load_frozen,summarize
-from .sampling import output_kind
+from .sampling import method_output_kind,output_kind
 
 def report_semantic(cfg,print_status=True):
  if not cfg.get('semantic_benchmark',{}).get('enabled'):return True
  variants,_,_,_=load_frozen();cells=[];details={};text=['# LATEN Benchmark — frozen 648-variant comparison','',f'Updated (Beijing): {C.now()}','', 'Test split: previously_exposed_test_diagnostic. No new training on this Benchmark.','', '| Model | Method | Done | Vector | Bits | Functional action | Model action | Target CF | Non-target CF | Both CF vectors | Mean task s |','|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
  for family in cfg['families']:
   for method in cfg['methods']:
-   p=C.STORE/'runs'/family/output_kind(cfg,'semantic')/method/'results.jsonl'
+   p=C.STORE/'runs'/family/method_output_kind(cfg,'semantic',method)/method/'results.jsonl'
    if p.exists():
     data=p.read_bytes();end=data.rfind(b'\n')+1;rows=[__import__('json').loads(x) for x in data[:end].splitlines() if x]
    else:rows=[]

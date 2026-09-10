@@ -7,7 +7,7 @@ from .semantic_engine import pipeline,action_diagnostic
 from .engine import Engine
 from .train import load_export
 from .parallel import partition_cases,worker_info,configure_allocator,model_setup_lock
-from .sampling import output_kind
+from .sampling import method_output_kind,output_kind
 
 def evaluate_semantic(family,method,cfg,smoke=False):
  C.install_signals();sem=cfg['semantic_benchmark'];variants,cases,programs,data=load_frozen() if smoke else selected_frozen(cfg)
@@ -15,11 +15,11 @@ def evaluate_semantic(family,method,cfg,smoke=False):
  if sem.get('do_sample') is not False or sem['reasoning_max_new_tokens']!=2048:raise ValueError('Preserve the authorized greedy 2048-token semantic protocol')
  if smoke:
   variants=[next(v for v in variants if v.split=='dev' and v.graph_level==g and v.information_level==i and v.target_fact_id is None) for g,i in zip(('G4','G5','G6'),('I3','I6','I9'))]
- directory=C.STORE/'runs'/family/('semantic_smoke' if smoke else output_kind(cfg,'semantic'))/method
+ directory=C.STORE/'runs'/family/('semantic_smoke_collect_v2' if smoke else method_output_kind(cfg,'semantic',method))/method
  execution=worker_info(cfg)
  if not smoke and os.environ.get('LATEN_INFERENCE_WORKER'):
   directory=directory/'shards'/str(execution['shard_index']);variants=partition_cases(variants,execution['shard_index'],execution['shard_count'])
- key=C.canon({'run':C.identity(cfg),'family':family,'method':method,'data':data,'smoke':smoke,'shard':(execution['shard_index'],execution['shard_count'])});C.seal(directory,key,{'family':family,'method':method,'smoke':smoke,'test_scope':'previously_exposed_test_diagnostic','test_inference_authorized_by_current_user_request':True})
+ key=C.canon({'run':C.evaluation_identity(cfg,method),'family':family,'method':method,'data':data,'smoke':smoke,'shard':(execution['shard_index'],execution['shard_count'])});C.seal(directory,key,{'family':family,'method':method,'smoke':smoke,'test_scope':'previously_exposed_test_diagnostic','test_inference_authorized_by_current_user_request':True})
  allowed={v.variant_id for v in variants};saved=C.rows(directory/'results.jsonl',repair=True);raw=C.rows(directory/'generations.jsonl',repair=True);done={r['variant_id']:r for r in saved};generated={r['variant_id']:r for r in raw}
  if len(done)!=len(saved) or len(generated)!=len(raw) or not (set(done)|set(generated))<=allowed or any(r['run_identity']!=key for r in saved+raw):raise ValueError('Semantic resume identity or matrix differs')
  def status(phase,**extra):C.write(directory/'status.json',{'status':phase,'completed':len(done),'expected':len(variants),'time':C.now(),**extra})

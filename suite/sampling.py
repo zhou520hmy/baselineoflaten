@@ -65,3 +65,8 @@ def save_selection(store,name,records,meta,source):
  if old is not None and (not p.exists() or C.sha(p)!=meta['selected_records_sha256']):raise ValueError('Saved sampled records were modified')
  if old is None:
   directory.mkdir(parents=True,exist_ok=True);p.write_text(payload);C.write(directory/(name+'.manifest.json'),meta)
+
+
+def method_output_kind(cfg,kind,method):
+ base=output_kind(cfg,kind)
+ return base+'_collect_v2' if method in ('latcom','interlat') else base

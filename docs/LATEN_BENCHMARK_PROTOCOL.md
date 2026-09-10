@@ -1,5 +1,7 @@
 # LATEN semantic Benchmark extension
 
+> Collection and continuation update (2026-09-10): [COLLECT_REPAIR.md](COLLECT_REPAIR.md) supersedes the old shared collection gate and fail-fast scheduling. Evaluation inputs, sampling and scorers remain unchanged; learned methods use versioned new training/evaluation directories.
+
 > Current execution revision (2026-09-09): [SAMPLED_PARALLEL_PROTOCOL.md](SAMPLED_PARALLEL_PROTOCOL.md) controls evaluation scheduling and scope. General tasks use fixed ~10% subsets (591 total); LATEN remains full 648/486. Default inference concurrency is two, training stays serial. There are 80 cells / 12,390 evaluated tasks. Older full-general counts and serial timing descriptions below document the source protocol, not the current default execution. New paths: evaluation_sample10 and semantic_parallel.
 
 ## Source and benchmark audit

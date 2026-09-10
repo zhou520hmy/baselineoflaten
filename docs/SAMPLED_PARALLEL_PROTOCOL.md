@@ -1,5 +1,7 @@
 # Sampled parallel evaluation revision
 
+> Collection and continuation update (2026-09-10): [COLLECT_REPAIR.md](COLLECT_REPAIR.md) supersedes the old shared collection gate and fail-fast scheduling. Evaluation inputs, sampling and scorers remain unchanged; learned methods use versioned new training/evaluation directories.
+
 Authorized on 2026-09-09: retain approximately one tenth of every general evaluation dataset, preserve complex tasks, and run inference concurrently on one B200. Training remains serial and unchanged. Existing method/source/metric scans remain in PROTOCOL.md and LATEN_BENCHMARK_PROTOCOL.md; this is a scheduling and evaluation-scope change, not a new method.
 
 ## Fixed selection, before model outcomes

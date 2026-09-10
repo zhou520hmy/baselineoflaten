@@ -50,7 +50,8 @@ def install_signals():
 def run(command,**kwargs):return subprocess.run(command,check=True,**kwargs)
 def model_path(family):return STORE/'models'/family
 
-def stage_dir(family,stage):return STORE/'runs'/family/'training'/stage
+def stage_dir(family,stage):return STORE/'runs'/family/'training_collect_v2'/stage
+def cache_dir(family):return STORE/'runs'/family/'training_cache_v2'
 
 def compatible_export_identities(cfg):
  current=identity(cfg);allowed={current}
@@ -60,3 +61,17 @@ def compatible_export_identities(cfg):
    previous=read(ROOT/'evidence'/filename)
    if previous and training_config(cfg)==training_config(previous['config']):allowed.add(previous['identity'])
  return allowed
+
+
+def evaluation_identity(cfg,method):
+ # Collection-only changes must not invalidate byte-identical training-free inference.
+ if method not in ('latentmas','latentmas_h2o','latentmas_hidden'):return identity(cfg)
+ prior=read(ROOT/'evidence/previous_parallel_release.json')
+ core=('suite/engine.py','suite/models.py','suite/scoring.py','suite/semantic_engine.py','suite/semantic.py','suite/data.py')
+ checked=(*core,*(name for name in prior['sources'] if name.startswith('vendor/')))
+ # Only the appended directory router changed in sampling.py; hash the original portion.
+ sampling_source=(ROOT/'suite/sampling.py').read_text().split('\n\ndef method_output_kind(')[0]
+ sampling_ok=hashlib.sha256(sampling_source.encode()).hexdigest()==prior['sources']['suite/sampling.py']
+ if not sampling_ok:return identity(cfg)
+ if any(sha(ROOT/name)!=prior['sources'][name] for name in checked) or sha(ROOT/'requirements.txt')!=prior['dependencies']:return identity(cfg)
+ return canon({'config':cfg,'sources':prior['sources'],'dependencies':prior['dependencies']})

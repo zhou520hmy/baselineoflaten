@@ -1,12 +1,12 @@
 import csv,io,statistics
-from .common import STORE,read,rows,write,now
-from .sampling import output_kind,expected_general
+from .common import STORE,read,rows,write,now,stage_dir
+from .sampling import method_output_kind,output_kind,expected_general
 
 def report(cfg,print_status=True):
  cells=[];table=[]
  for family in cfg['families']:
   for method in cfg['methods']:
-   directory=STORE/'runs'/family/output_kind(cfg,'evaluation')/method
+   directory=STORE/'runs'/family/method_output_kind(cfg,'evaluation',method)/method
    try:raw=rows(directory/'results.jsonl')
    except ValueError:
     # Reporting never repairs a file while a worker may be writing it.
@@ -34,7 +34,7 @@ def report(cfg,print_status=True):
  text+=['## Training stages','', '| Family | Stage | State | Step |','|---|---|---|---|']
  for family in cfg['families']:
   for stage in ('latcom_stage1','latcom_stage2','interlat_receiver','interlat_compression'):
-   state=read(STORE/'runs'/family/'training'/stage/'status.json',{});text.append(f'| {family} | {stage} | {state.get("status","pending")} | {state.get("step","—")} |')
+   state=read(stage_dir(family,stage)/'status.json',{});text.append(f'| {family} | {stage} | {state.get("status","pending")} | {state.get("step","—")} |')
  text+=['','Efficiency CSV covers every sender and final receiver; setup, training, code judging are excluded from inference time. Generated text tokens, latent positions, prefill and bytes are distinct. Parallel timings are contention diagnostics, not comparable isolated latency. Accumulated overlapping task seconds are not stage elapsed time; see scheduler_wall.jsonl. Token counts retain whole-path definitions.']
  out=STORE/'reports';out.mkdir(parents=True,exist_ok=True);write(out/'summary.json',{'time':now(),'cells':cells,'complete':all(c['status']=='completed' for c in cells),'expected_cells':len(cells)})
  stream=io.StringIO();writer=csv.DictWriter(stream,fieldnames=list(cells[0]));writer.writeheader();writer.writerows(cells);(out/'summary.csv').write_text(stream.getvalue());(out/'summary.md').write_text('\n'.join(text)+'\n')

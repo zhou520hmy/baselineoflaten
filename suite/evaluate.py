@@ -5,14 +5,14 @@ from .data import evaluation_items
 from .engine import Engine
 from .train import load_export
 from .parallel import partition,worker_info,configure_allocator,model_setup_lock
-from .sampling import output_kind
+from .sampling import method_output_kind,output_kind
 from .scoring import code_score,simple_score
 
 def evaluate(family,method,cfg,smoke=False):
- C.install_signals();directory=C.STORE/'runs'/family/('smoke' if smoke else output_kind(cfg,'evaluation'))/method
+ C.install_signals();directory=C.STORE/'runs'/family/('smoke_collect_v2' if smoke else method_output_kind(cfg,'evaluation',method))/method
  execution=worker_info(cfg)
  if not smoke and os.environ.get('LATEN_INFERENCE_WORKER'):directory=directory/'shards'/str(execution['shard_index'])
- key=C.canon({'run':C.identity(cfg),'family':family,'method':method,'data':C.read(C.STORE/'data/manifest.json')['identity'],'smoke':smoke,'shard':(execution['shard_index'],execution['shard_count'])})
+ key=C.canon({'run':C.evaluation_identity(cfg,method),'family':family,'method':method,'data':C.read(C.STORE/'data/manifest.json')['identity'],'smoke':smoke,'shard':(execution['shard_index'],execution['shard_count'])})
  C.seal(directory,key,{'family':family,'method':method,'provenance':'paper_derived_port' if method in ('latcom','interlat') else 'explicit_upstream_protocol_reimplementation','smoke':smoke})
  items=[]
  for task in (['gsm8k'] if smoke else cfg['datasets']):
