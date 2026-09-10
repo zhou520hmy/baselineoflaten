@@ -52,6 +52,9 @@ def complete_lines(path):
 
 
 def atomic_rows(path,rows):
+ from .stat_records import prepare_record
+ rows=[value for row in rows if (value:=prepare_record(path,row)) is not None]
+ if path.name=='generations.jsonl' and not rows:return
  path.parent.mkdir(parents=True,exist_ok=True);temp=path.with_suffix(path.suffix+f'.{os.getpid()}.tmp')
  temp.write_text(''.join(json.dumps(r,ensure_ascii=False)+'\n' for r in rows));os.replace(temp,path)
 
@@ -135,6 +138,3 @@ def parallel_evaluate(action,family,method,cfg,cfg_path):
    state=C.read(directory/'status.json');C.write(directory/'status.json',{**state,'status':'blocked','failed_shards':failed})
    raise RuntimeError(f'Inference shards failed: {failed}; see {directory}/logs; no examples dropped')
   if C.read(directory/'status.json')['completed']!=len(allowed):raise RuntimeError('Workers exited without complete coverage')
-  if action=='semantic':
-   from .semantic import summarize
-   C.write(directory/'summary.json',summarize(C.rows(directory/'results.jsonl'),variants))

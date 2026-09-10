@@ -23,7 +23,7 @@ def evaluate_semantic(family,method,cfg,smoke=False):
  allowed={v.variant_id for v in variants};saved=C.rows(directory/'results.jsonl',repair=True);raw=C.rows(directory/'generations.jsonl',repair=True);done={r['variant_id']:r for r in saved};generated={r['variant_id']:r for r in raw}
  if len(done)!=len(saved) or len(generated)!=len(raw) or not (set(done)|set(generated))<=allowed or any(r['run_identity']!=key for r in saved+raw):raise ValueError('Semantic resume identity or matrix differs')
  def status(phase,**extra):C.write(directory/'status.json',{'status':phase,'completed':len(done),'expected':len(variants),'time':C.now(),**extra})
- if len(done)==len(variants):status('completed');C.write(directory/'summary.json',summarize(saved,variants));return
+ if len(done)==len(variants):status('completed');return
  status('loading_model');configure_allocator(cfg)
  with model_setup_lock():
   engine=Engine(C.model_path(family),cfg);engine.realign_init();modules={};exports={}
@@ -48,5 +48,4 @@ def evaluate_semantic(family,method,cfg,smoke=False):
   except Exception as e:
    C.append(directory/'infrastructure_errors.jsonl',{'variant_id':v.variant_id,'type':type(e).__name__,'error':str(e),'time':C.now(),'scored':False});status('blocked',current=v.variant_id,error=str(e));raise
   status('running',last=v.variant_id)
-  if len(done)%10==0 or smoke:C.write(directory/'summary_progress.json',summarize(list(done.values()),variants))
- C.write(directory/'summary.json',summarize(list(done.values()),variants));status('completed')
+ status('completed')

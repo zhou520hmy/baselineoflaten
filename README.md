@@ -1,54 +1,73 @@
-# LATEN Baselines — Single B200
+# B200 latent-communication baseline suite
 
-单张 B200 上运行 **Interlat、LatentMAS、LatentMAS-H2O、LatentMAS-Hidden、LatCom**，模型为 **Qwen3-4B / Qwen3-8B**。
+**Start with the [Chinese operator handoff / 中文接手说明](README_ZH.md).** It contains the complete resume procedure, directory map, metrics, disk requirements and failure handling.
 
-**当前默认：推理双进程并行，七个通用数据集分层抽样约 10%，我们自己的 LATEN Benchmark 保持全量。** 共 80 个评测单元、12,390 次任务。训练和训练数据生成保持串行，训练预算不变。
+Five methods (LatentMAS, LatentMAS-H2O, LatentMAS-Hidden, LatCom, Interlat), Qwen3-4B / 8B. Seven general tasks use a fixed stratified ~10% sample; the in-house LATEN Benchmark remains **648 variants / 486 pairs in full**. Total: 80 cells / 12,390 task evaluations, plus collection and training. LatCom / Interlat are explicitly nonofficial `paper_derived_port` implementations, not original author checkpoints or V6.
 
-```bash
-bash run.sh
-```
+## Resume an existing installation
 
-自定义大文件位置：
-
-```bash
-GPU_ID=0 LATEN_STORE=/data/laten_baselines bash run.sh
-```
-
-2026-09-10 已修复 collect 的控制符误判，拆分 LatCom/Interlat 收集门槛，并保留已完成免训练评测的续跑能力。远端旧任务停止后：
+Wait for previous coordinators to stop, retain the original store and configuration, then update the checkout. Do not delete models, datasets, scores or checkpoints.
 
 ```bash
 git pull --ff-only
 GPU_ID=3 LATEN_STORE=/data/laten_baselines bash run_remaining.sh --family 4b
 ```
 
-另一张卡明确选择 8B（目录名不决定模型）：
+On the second GPU, in a separate terminal/store:
 
 ```bash
 GPU_ID=5 LATEN_STORE=/data/laten_baselines_8b bash run_remaining.sh --family 8b
 ```
 
-也可不指定 `--family`，单卡依次跑两种规模。继续使用原运行配置；自定义过配置时传 `--config`。[收集修复、证据边界和续跑细节](docs/COLLECT_REPAIR.md)。旧结果身份不匹配会保留并报错，不自动混入。训练前需留足断点空间；报告中的 90 GiB 空闲不足以安全训练 8B。
+The store name does **not** select model size. Always use `--family 8b` for that branch. With one GPU, omit `--family` to run both families sequentially. Append `--config configs/local.json` if the original run used that configuration. Never run overlapping coordinators against one store.
 
-目标环境：空闲 B200（至少 170 GiB）、Python 3.10–3.12、Git、Docker、至少 256 GB 主机内存和首次运行 500 GiB 空闲磁盘。脚本固定下载版本和路径，支持断点恢复；双进程显存不足时保留结果，自动串行重试受影响分片。
+Verified environments/assets/reference tests are reused. Completed evaluation identities, IDs and shards are validated and skipped before model inference. Partial evaluations and valid v2 training checkpoints resume. The collection repair uses versioned `training_cache_v2` / `training_collect_v2`; rejected legacy caches are retained and recollected under the corrected eligibility rules. Output-only updates preserve known execution identities after checking unchanged compute sources. Unknown source/config mismatches stop without overwriting prior work.
 
-| 数据集 | 每个模型/方法的评测量 |
-|---|---:|
-| GSM8K | 132 / 1,319 |
-| ARC-E | 238 / 2,376 |
-| ARC-C | 117 / 1,172 |
-| MedQA | 30 / 300 |
-| MBPP+ | 38 / 378 |
-| HumanEval+ | 16 / 164 |
-| GPQA-Diamond | 20 / 198 |
-| LATEN Benchmark | **648 / 648，486 对 BASE/CF** |
+The reported 90 GiB free is insufficient for safe 8B training. Resume preflight requires at least 150 GiB, and per-stage checkpoint checks can require more. For two training stores on one filesystem, plan approximately 400–500 GiB free; checks do not reserve space against other jobs. Nothing is automatically deleted to make room.
 
-所有方法和模型使用同一固定样本。通用数据按题长、代码结构复杂度代理分为三层等额抽取，保留长题和复杂代码；代理不等于经验证的难度标签。抽样不使用模型得分。整条任务路径的 Token、latent、prefill 和通信量继续报告；耗时标记为并行争用下的诊断值，不作为独占显卡速度对比。
+## Deliver only statistics TXT
 
-- [完整中文运行说明](README_ZH.md)
-- [抽样与并行协议](docs/SAMPLED_PARALLEL_PROTOCOL.md)
-- [五方法协议和迁移差异](docs/PROTOCOL.md)
-- [全量 LATEN 协议](docs/LATEN_BENCHMARK_PROTOCOL.md)
-- [默认配置](configs/default.json)
-- [本地验证记录](evidence/validation.json)
+Export offline, with system Python and no model loading, GPU, download or repeated evaluation:
 
-Interlat 和 LatCom 是按论文设计实现的非官方 Qwen3 训练迁移，不是作者原始 checkpoint 的完全复现。MedQA 的来源本身是 300 题子集；代码使用固定 HF EvalPlus 扩展测试。尚无本包在目标 B200 上的正式训练和跑分结果。模型、凭据、缓存与运行结果不纳入 Git。
+```bash
+LATEN_STORE=/data/laten_baselines bash run.sh export-txt
+LATEN_STORE=/data/laten_baselines_8b bash run.sh export-txt
+```
+
+`status` and `report` refresh the same output. **Return only `LATEN_STORE/STATS_TXT/*.txt`**, keeping the two stores separate. Wait for export to finish before copying.
+
+Read `00_README.txt`, then `01_INDEX.txt`; the latter lists part order, byte counts and SHA256. Every UTF-8 file is at most **88,000 bytes**, below 90 KB, including Chinese text and headers. Long sections split into `.p001.txt`, `.p002.txt`, etc.
+
+| Prefix | Statistics |
+|---|---|
+| 02 | Coverage, model revisions, seed, output caps |
+| 03 | General-task counts, accuracy, macro/micro aggregates, full-path tokens |
+| 04 | Overall LATEN metrics, CF pairs, efficiency |
+| 05 | Per-model/method LATEN stratification and conditional fact errors |
+| 06 | Training stage progress and numerical losses |
+| 07 | Collection scan/retention and method-specific gates |
+| 08 | Historical branch failure counts and exception types |
+| 09 | Recorded scheduler attempt durations including setup/scoring/retries |
+
+No per-question prompts, answers, generated code, reasoning, token IDs, raw exceptions or traces are exported. New evaluation journals omit generated text. Runtime model/data/training tensors and targets, weights, optimizer state, identity manifests and minimal scoring journals must remain local for continuation; they are **not deliverables**. Existing historical raw files are neither deleted nor exported. An unfinished general sample interrupted before its score was committed may regenerate; committed scores are reused.
+
+Scores are fractions from 0 to 1; `NA` is unavailable, not zero. Macro accuracy is produced only after all seven datasets finish. Partial micro accuracy covers only completed rows. Full-path generated text tokens, latent positions, prompt/prefill positions and transmitted bytes remain distinct. Parallel wall times are contention diagnostics, not isolated-GPU speed comparisons. See [TXT policy](docs/TXT_HANDOFF.md), [collection repair](docs/COLLECT_REPAIR.md), [method protocol](docs/PROTOCOL.md), and [LATEN metric protocol](docs/LATEN_BENCHMARK_PROTOCOL.md).
+
+## Fresh installation
+
+Linux, Python 3.10–3.12 with venv, Git, working Docker, a B200 with at least 170 GiB VRAM, 256 GB RAM, and 500 GiB free disk (1 TB recommended). PyTorch is pinned to 2.7.1 / CUDA 12.8. Downloads need Hugging Face, GitHub, PyTorch and Docker access. Configure credentials/proxies locally.
+
+```bash
+GPU_ID=0 LATEN_STORE=/data/laten_baselines bash run.sh
+```
+
+Training is serial. Evaluation defaults to two processes on one GPU with disjoint shards and 45% allocator allowance each. OOM shards retry serially at 90%, without dropping tasks or reducing token caps. Other failed branches continue independently; a blocked matrix exits nonzero and is never reported as complete.
+
+## Verification
+
+```bash
+bash run.sh validate
+.venv/bin/python -m unittest discover -s tests -p 'test_tiny*.py' -v
+```
+
+43 static/scheduler/continuation/TXT tests and 16 tiny CPU tests pass locally; see `evidence/validation.json`. These are engineering checks, not a new B200 run or evidence that collection retention, training convergence or benchmark scores have succeeded on the target server.

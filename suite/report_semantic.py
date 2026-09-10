@@ -4,8 +4,8 @@ from . import common as C
 from .semantic import load_frozen,summarize
 from .sampling import method_output_kind,output_kind
 
-def report_semantic(cfg,print_status=True):
- if not cfg.get('semantic_benchmark',{}).get('enabled'):return True
+def semantic_statistics(cfg):
+ if not cfg.get('semantic_benchmark',{}).get('enabled'):return {'cells':[],'details':{},'complete':True,'expected_cells':0,'display_text':''}
  variants,_,_,_=load_frozen();cells=[];details={};text=['# LATEN Benchmark — frozen 648-variant comparison','',f'Updated (Beijing): {C.now()}','', 'Test split: previously_exposed_test_diagnostic. No new training on this Benchmark.','', '| Model | Method | Done | Vector | Bits | Functional action | Model action | Target CF | Non-target CF | Both CF vectors | Mean task s |','|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
  for family in cfg['families']:
   for method in cfg['methods']:
@@ -21,8 +21,11 @@ def report_semantic(cfg,print_status=True):
    mean=f'{cell["mean_task_seconds"]:.3f}' if n else '—'
    text.append('| '+' | '.join([family,method,f'{n}/648',rate(m['vector_exact'],n),rate(m['bit_correct'],m['bit_total']),rate(m['functional_action_exact'],n),rate(m['model_action_exact'],n),rate(pairs['target_pair_exact'],pairs['pair_count']),rate(pairs['non_target_pair_exact'],pairs['pair_count']),rate(pairs['both_vectors_exact'],pairs['pair_count']),mean])+' |')
  text+=['','Task seconds are contended wall-time diagnostics. Summed overlapping task durations are not stage elapsed time; throughput is not an isolated-method comparison. See scheduler_wall.jsonl for coordinator wall time.']
- out=C.STORE/'reports';out.mkdir(parents=True,exist_ok=True);complete=all(c['status']=='completed' for c in cells)
- C.write(out/'semantic_summary.json',{'time':C.now(),'complete':complete,'expected_cells':len(cells),'cells':cells,'details':details})
- stream=io.StringIO();writer=csv.DictWriter(stream,fieldnames=list(cells[0]));writer.writeheader();writer.writerows(cells);(out/'semantic_summary.csv').write_text(stream.getvalue());(out/'semantic_summary.md').write_text('\n'.join(text)+'\n')
- if print_status:print('\n'.join(text))
- return complete
+ return {'time':C.now(),'complete':all(c['status']=='completed' for c in cells),'expected_cells':len(cells),'cells':cells,'details':details,'display_text':'\n'.join(text)+'\n'}
+
+
+def report_semantic(cfg,print_status=True):
+ # Compatibility helper; only the public report() writes the complete TXT handoff.
+ result=semantic_statistics(cfg)
+ if print_status:print(result['display_text'])
+ return result['complete']

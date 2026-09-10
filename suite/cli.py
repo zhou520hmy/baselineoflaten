@@ -30,10 +30,17 @@ def doctor():
  if not torch.isfinite(y).all():raise RuntimeError('B200 BF16 smoke failed')
  torch.cuda.synchronize();C.write(C.STORE/'environment/gpu_doctor.json',{'torch':torch.__version__,'cuda':torch.version.cuda,'capability':list(torch.cuda.get_device_capability()),'time':C.now()})
 
-def downloads(cfg):
+def downloads(cfg,families=None):
  from huggingface_hub import snapshot_download
  from .data import build_data
- for family,spec in cfg['families'].items():
+ from .assets import assets_ready,model_ready,references_ready
+ families=list(families or cfg['families'])
+ if assets_ready(cfg,families):
+  print('SKIP verified downloads and code reference checks',flush=True);return
+ for family in families:
+  spec=cfg['families'][family]
+  if model_ready(family,cfg):
+   print('SKIP downloaded model',family,flush=True);continue
   snapshot_download(spec['repo'],revision=spec['revision'],local_dir=C.model_path(family),allow_patterns=['*.json','*.safetensors','*.txt','*.model','*.tiktoken','LICENSE*'])
   modelconfig=C.read(C.model_path(family)/'config.json')
   if modelconfig.get('model_type')!='qwen3':raise ValueError('Unexpected model family')
@@ -51,8 +58,11 @@ def downloads(cfg):
   if head!=commit:raise ValueError('Upstream checkout identity differs')
  build_data(cfg)
  image_meta=C.read(C.STORE/'sandbox/image.json');docker_hash=C.canon({p.name:C.sha(p) for p in (C.ROOT/'sandbox').iterdir() if p.is_file()})
- if not image_meta or image_meta['build_hash']!=docker_hash:
+ image_present=bool(image_meta) and subprocess.run(['docker','image','inspect',image_meta['image_id']],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode==0
+ if not image_present or image_meta['build_hash']!=docker_hash:
   C.run(['docker','build','--pull','-t',cfg['code_tests']['docker_image'],str(C.ROOT/'sandbox')]);image=C.run(['docker','image','inspect','--format','{{.Id}}',cfg['code_tests']['docker_image']],capture_output=True,text=True).stdout.strip();C.write(C.STORE/'sandbox/image.json',{'image_id':image,'build_hash':docker_hash,'time':C.now()})
+ if references_ready(cfg):
+  print('SKIP completed code reference checks',flush=True);return
  from .scoring import code_score
  fixture={'test_code':'assert add(2, 3) == 5','dataset':'mbppplus'}
  if not code_score(fixture,'```python\ndef add(a,b): return a+b\n```',cfg)['correct']:raise RuntimeError('Code sandbox positive canary failed')
@@ -78,13 +88,22 @@ def child(action,cfg_path,*extra):
  return subprocess.run(command,cwd=C.ROOT).returncode
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('action',choices=['all','_smoke_one','preflight-host','_doctor','download','collect','train','evaluate','semantic','semantic-all','eval-all','semantic-smoke','smoke','report','status']);p.add_argument('--config',default=str(C.ROOT/'configs/default.json'));p.add_argument('--family',choices=['4b','8b']);p.add_argument('--method',choices=['latentmas','latentmas_h2o','latentmas_hidden','latcom','interlat']);p.add_argument('--stage',choices=['latcom_stage1','latcom_stage2','interlat_receiver','interlat_compression']);a=p.parse_args();cfg=C.config(a.config);C.STORE.mkdir(parents=True,exist_ok=True)
+ p=argparse.ArgumentParser();p.add_argument('action',choices=['all','resume','export-txt','_env_check','_smoke_one','preflight-host','_doctor','download','collect','train','evaluate','semantic','semantic-all','eval-all','semantic-smoke','smoke','report','status']);p.add_argument('--config',default=str(C.ROOT/'configs/default.json'));p.add_argument('--family',choices=['4b','8b']);p.add_argument('--method',choices=['latentmas','latentmas_h2o','latentmas_hidden','latcom','interlat']);p.add_argument('--stage',choices=['latcom_stage1','latcom_stage2','interlat_receiver','interlat_compression']);a=p.parse_args();cfg=C.config(a.config);C.STORE.mkdir(parents=True,exist_ok=True)
  if a.action=='preflight-host':print(json.dumps(host_checks()));return
  if a.action=='_doctor':doctor();return
- if a.action in ('status','report'):
+ if a.action=='_env_check':
+  import importlib.metadata as M
+  for line in (C.ROOT/'requirements.txt').read_text().splitlines():
+   if '==' in line:
+    name,version=line.split('==')
+    if M.version(name)!=version:raise RuntimeError('Installed dependency version differs: '+name)
+  import torch
+  if torch.__version__.split('+')[0]!='2.7.1' or torch.version.cuda!='12.8':raise RuntimeError('Pinned torch2.7.1+cu128 required')
+  return
+ if a.action in ('status','report','export-txt'):
   from .report import report
   report(cfg);return
- if a.action=='download':downloads(cfg);return
+ if a.action=='download':downloads(cfg,[a.family] if a.family else None);return
  if a.action=='collect':
   from .collect import collect
   if not a.family:p.error('--family required')
@@ -115,7 +134,7 @@ def main():
   fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB);host=C.STORE/'environment/host.json';C.write(host,host_checks())
   cfg_path=__import__('pathlib').Path(a.config).resolve();key=C.identity(cfg);C.seal(C.STORE/('sampled_eval_v2_run_identity' if a.action=='eval-all' else 'semantic_collect_v2_run_identity' if a.action=='semantic-all' else 'collection_v2_run_identity'),key,{'config':cfg})
   if child('_doctor',cfg_path)!=0:raise RuntimeError('B200 environment validation failed')
-  if a.action!='semantic-all' and child('download',cfg_path)!=0:raise RuntimeError('Download/setup failed')
+  if a.action!='semantic-all' and child('download',cfg_path,*(['--family',a.family] if a.family else []))!=0:raise RuntimeError('Download/setup failed')
   from .report import report
   for family in ([a.family] if a.family else cfg['families']):
    if a.action in ('semantic-all','eval-all'):
@@ -124,7 +143,7 @@ def main():
      rc=child('semantic',cfg_path,'--family',family,'--method',method);report(cfg,False)
      if rc:raise RuntimeError(f'{family}/{method} semantic evaluation stopped; saved progress retained')
     continue
-   if a.action=='all':continue
+   if a.action in ('all','resume'):continue
    # Short real-model interface checks; separate directory, never counted as benchmark scores.
    for method in ('latentmas','latentmas_h2o','latentmas_hidden'):
     command=[sys.executable,'-c','from suite.common import config; from suite.evaluate import evaluate; import sys; evaluate(sys.argv[1],sys.argv[2],config(sys.argv[3]),smoke=True)',family,method,str(cfg_path)]
@@ -132,13 +151,18 @@ def main():
    if a.action=='smoke':continue
    # Full scheduling occurs once below, not once per family in this setup loop.
   failures=[]
-  if a.action=='all':
+  if a.action in ('all','resume'):
    from .schedule import run_remaining
-   failures=run_remaining([a.family] if a.family else list(cfg['families']),cfg['methods'],cfg.get('semantic_benchmark',{}).get('enabled',False),lambda action,*extra:child(action,cfg_path,*extra),lambda:report(cfg,False))
+   from .resume import evaluation_complete,can_skip_smoke
+   def skip(action,family,method,stage):
+    if action=='_smoke_one':return can_skip_smoke(cfg,family,method)
+    if action in ('evaluate','semantic'):return evaluation_complete(cfg,family,method,'evaluation' if action=='evaluate' else 'semantic')
+    return False  # Completed collection/training verify their own hashes and exit without GPU work.
+   failures=run_remaining([a.family] if a.family else list(cfg['families']),cfg['methods'],cfg.get('semantic_benchmark',{}).get('enabled',False),lambda action,*extra:child(action,cfg_path,*extra),lambda:report(cfg,False),skip=skip)
   complete=report(cfg)
-  if a.action=='semantic-all' and C.read(C.STORE/'reports/semantic_summary.json')['complete']:C.write(C.STORE/'SEMANTIC_COMPLETE.json',{'identity':key,'completed_cells':len(cfg['families'])*len(cfg['methods']),'time':C.now()})
-  if failures:raise RuntimeError(f'{len(failures)} branches blocked; independent branches were attempted. See branch_failures.jsonl and reports.')
-  if a.action in ('all','eval-all') and complete:C.write(C.STORE/'COMPLETE.json',{'identity':key,'completed_cells':len(cfg['families'])*len(cfg['methods'])*(len(cfg['datasets'])+int(cfg.get('semantic_benchmark',{}).get('enabled',False))),'time':C.now()})
+  if a.action=='semantic-all' and __import__('suite.report_semantic',fromlist=['semantic_statistics']).semantic_statistics(cfg)['complete']:C.write(C.STORE/'SEMANTIC_COMPLETE.json',{'identity':key,'completed_cells':len(cfg['families'])*len(cfg['methods']),'time':C.now()})
+  if failures:raise RuntimeError(f'{len(failures)} branches blocked; independent branches were attempted. See STATS_TXT/08_failures and STATS_TXT/07_collect.')
+  if a.action in ('all','resume','eval-all') and complete:C.write(C.STORE/'COMPLETE.json',{'identity':key,'completed_cells':len(cfg['families'])*len(cfg['methods'])*(len(cfg['datasets'])+int(cfg.get('semantic_benchmark',{}).get('enabled',False))),'time':C.now()})
 if __name__=='__main__':
  try:main()
  except Exception as e:

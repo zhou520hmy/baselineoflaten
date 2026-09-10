@@ -29,7 +29,7 @@ class WorkerCPU(unittest.TestCase):
    saved=C.rows(root/'results.jsonl')
    for item,row in zip(items,saved):
     with torch.inference_mode():direct=self.engine.pipeline({**item,'cap':2},'latentmas')
-    self.assertEqual(row['output']['token_ids'],direct['output']['token_ids']);self.assertEqual(row['efficiency']['generated_text_tokens'],direct['efficiency']['generated_text_tokens']);self.assertEqual(row['execution']['runtime_concurrency_bound'],2)
+    self.assertNotIn('output',row);self.assertEqual(row['output_token_count'],direct['output']['output_tokens']);self.assertEqual(row['efficiency']['generated_text_tokens'],direct['efficiency']['generated_text_tokens']);self.assertEqual(row['execution']['runtime_concurrency_bound'],2)
    with patch.dict(os.environ,{'LATEN_INFERENCE_WORKER':'1','LATEN_SHARD_INDEX':'0','LATEN_SHARD_COUNT':'2','LATEN_RUNTIME_CONCURRENCY':'1','LATEN_RETRY_MODE':'serial_after_oom'}),patch.object(E,'Engine',side_effect=AssertionError('Do not load for complete shard')):E.evaluate('4b','latentmas',cfg)
  def test_actual_semantic_worker_whole_pairs_and_resume(self):
   variants,cases,programs,manifest=load_frozen();ids=list(dict.fromkeys(v.case_id for v in variants))[:2];variants=[v for v in variants if v.case_id in ids]
@@ -41,5 +41,6 @@ class WorkerCPU(unittest.TestCase):
     with patch.dict(os.environ,{'LATEN_INFERENCE_WORKER':'1','LATEN_SHARD_INDEX':str(i),'LATEN_SHARD_COUNT':'2','LATEN_RUNTIME_CONCURRENCY':'2'}):S.evaluate_semantic('4b','latentmas',self.cfg)
    root=Path(d)/'runs/4b/semantic_parallel/latentmas';self.assertEqual(merge(root,2,[v.variant_id for v in variants],'variant_id'),8)
    for i in range(2):
-    summary=C.read(root/'shards'/str(i)/'summary.json');self.assertTrue(summary['complete']);self.assertEqual(summary['pairs']['pair_count'],3)
+    from suite.semantic import summarize
+    part=[v for v in variants if v.variant_id in {r['variant_id'] for r in C.rows(root/'shards'/str(i)/'results.jsonl')}];summary=summarize(C.rows(root/'shards'/str(i)/'results.jsonl'),part);self.assertTrue(summary['complete']);self.assertEqual(summary['pairs']['pair_count'],3)
    with patch.dict(os.environ,{'LATEN_INFERENCE_WORKER':'1','LATEN_SHARD_INDEX':'1','LATEN_SHARD_COUNT':'2','LATEN_RUNTIME_CONCURRENCY':'1'}),patch.object(S,'Engine',side_effect=AssertionError('Do not reload for completed shard')):S.evaluate_semantic('4b','latentmas',self.cfg)

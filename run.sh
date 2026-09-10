@@ -17,19 +17,23 @@ mkdir -p "$TMPDIR"
 export PYTHONDONTWRITEBYTECODE=1 TOKENIZERS_PARALLELISM=false OMP_NUM_THREADS=4
 ACTION="${1:-all}"; if (($#)); then shift; fi
 if [[ "$ACTION" == validate ]]; then
-  exec "${PYTHON_BIN:-python3}" -c "import unittest,sys; s=unittest.defaultTestLoader.discover('tests',pattern='test_[sd]*.py'); assert s.countTestCases()>=33, 'Missing tests'; sys.exit(not unittest.TextTestRunner(verbosity=2).run(s).wasSuccessful())"
+  exec "${PYTHON_BIN:-python3}" -c "import unittest,sys; s=unittest.defaultTestLoader.discover('tests',pattern='test_[sd]*.py'); assert s.countTestCases()>=43, 'Missing tests'; sys.exit(not unittest.TextTestRunner(verbosity=2).run(s).wasSuccessful())"
 fi
-if [[ "$ACTION" == status || "$ACTION" == report ]]; then
+if [[ "$ACTION" == status || "$ACTION" == report || "$ACTION" == export-txt ]]; then
   exec "${PYTHON_BIN:-python3}" -m suite.cli "$ACTION" "$@"
 fi
 export CUDA_VISIBLE_DEVICES="${GPU_ID:-0}"
-if [[ "$ACTION" == all || "$ACTION" == bootstrap ]]; then
+if [[ "$ACTION" == all || "$ACTION" == resume || "$ACTION" == bootstrap ]]; then
   "${PYTHON_BIN:-python3}" -m suite.cli preflight-host "$@"
-  if [[ ! -x .venv/bin/python ]]; then "${PYTHON_BIN:-python3}" -m venv .venv; fi
-  .venv/bin/python -m pip install --upgrade 'pip==25.1.1'
-  .venv/bin/python -m pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cu128
-  .venv/bin/python -m pip install -r requirements.txt
-  .venv/bin/python -m pip check
+  if [[ -x .venv/bin/python ]] && .venv/bin/python -m suite.cli _env_check >/dev/null 2>&1; then
+    echo 'SKIP verified existing Python environment'
+  else
+    if [[ ! -x .venv/bin/python ]]; then "${PYTHON_BIN:-python3}" -m venv .venv; fi
+    .venv/bin/python -m pip install --upgrade 'pip==25.1.1'
+    .venv/bin/python -m pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cu128
+    .venv/bin/python -m pip install -r requirements.txt
+    .venv/bin/python -m pip check
+  fi
   if [[ "$ACTION" == bootstrap ]]; then exit 0; fi
 fi
 if [[ ! -x .venv/bin/python ]]; then echo 'Run bash run.sh bootstrap first.' >&2; exit 2; fi

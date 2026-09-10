@@ -1,12 +1,14 @@
 """Independent branch failures do not suppress the remaining experiment matrix."""
 from . import common as C
 
-def run_remaining(families,methods,semantic_enabled,call,report):
+def run_remaining(families,methods,semantic_enabled,call,report,skip=None):
  failures=[]
  def attempt(action,family,method=None,stage=None):
   extra=['--family',family]
   if method:extra+=['--method',method]
   if stage:extra+=['--stage',stage]
+  if skip and skip(action,family,method,stage):
+   print('SKIP completed',family,method or stage or action,action,flush=True);report();return True
   rc=call(action,*extra)
   if rc:
    event={'action':action,'family':family,'method':method,'stage':stage,'exit_code':rc,'time':C.now(),'scored':False};failures.append(event);C.append(C.STORE/'branch_failures.jsonl',event)

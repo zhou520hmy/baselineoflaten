@@ -20,6 +20,9 @@ def read(path,default=None):
 def write(path,obj):
  path=Path(path);path.parent.mkdir(parents=True,exist_ok=True);temp=path.with_suffix(path.suffix+f'.{os.getpid()}.tmp');temp.write_text(json.dumps(obj,ensure_ascii=False,indent=2)+'\n');os.replace(temp,path)
 def append(path,obj):
+ from .stat_records import prepare_record
+ obj=prepare_record(path,obj)
+ if obj is None:return
  path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
  with path.open('a') as f:f.write(json.dumps(obj,ensure_ascii=False)+'\n');f.flush();os.fsync(f.fileno())
 def rows(path,repair=False):
@@ -35,6 +38,13 @@ def rows(path,repair=False):
 
 def config(path=None):return read(path or ROOT/'configs/default.json')
 def identity(config):
+ # Pure logging/export/scheduling updates reuse the verified 471c487 workload.
+ prior=read(ROOT/'evidence/previous_collect_release.json')
+ if prior:
+  core=('suite/engine.py','suite/models.py','suite/train.py','suite/losses.py','suite/collection_policy.py','suite/collect.py','suite/data.py','suite/semantic_engine.py','suite/semantic.py','suite/sampling.py','suite/disk_budget.py')
+  checked=(*core,*(name for name in prior['sources'] if name.startswith('vendor/')))
+  if all(sha(ROOT/name)==prior['sources'][name] for name in checked) and sha(ROOT/'requirements.txt')==prior['dependencies']:
+   return canon({'config':config,'sources':prior['sources'],'dependencies':prior['dependencies']})
  sources={str(p.relative_to(ROOT)):sha(p) for folder in ('suite','vendor') for p in (ROOT/folder).rglob('*') if p.is_file() and p.suffix in ('.py','.json','.jsonl')}
  return canon({'config':config,'sources':sources,'dependencies':sha(ROOT/'requirements.txt')})
 def seal(directory,key,metadata):

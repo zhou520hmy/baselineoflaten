@@ -1,34 +1,110 @@
-# 单张 B200：训练串行、推理并行的基线评测包
+# B200 基线评测：续跑与统计 TXT 交接
 
-默认测试 Interlat、LatentMAS、LatentMAS-H2O、LatentMAS-Hidden、LatCom，模型为 Qwen3-4B 和 Qwen3-8B。七个通用数据集各缩减到约 10%，**我们自己的 LATEN Benchmark 全量保留**。合计 80 个评测单元、12,390 次任务推理（旧全量矩阵为 65,550 次）。训练数据生成和四阶段训练预算没有缩减。
+本包比较 **LatentMAS、LatentMAS-H2O、LatentMAS-Hidden、LatCom、Interlat** 在 Qwen3-4B / Qwen3-8B 上的表现。七个通用任务固定抽样约 10%，**LATEN 自有 Benchmark 保留全量 648 条 / 486 对**。完整矩阵为 80 个评测单元、12,390 次任务推理；训练数据生成与训练另计。
 
-本包是统一协议迁移实现。Interlat/LatCom 使用本包的论文设计迁移训练，标记 `paper_derived_port`，不是作者原始 checkpoint；也不使用我们工程的 V6 权重。方法、损失和来源差异见 [PROTOCOL.md](docs/PROTOCOL.md)。
+本版修复 collect 过滤与独立分支调度，并将交付结果统一为 **统计 TXT 文件，每个最多 88,000 字节，严格低于 90 KB**。不导出问题、答案、代码、推理或 token IDs。已完成且身份一致的工作继续复用。
 
-## 一键启动
+## 1. 接手现有服务器：直接继续未完成部分
 
-目标服务器需要 Linux、Python 3.10–3.12（含 venv）、Git、可运行的 Docker、空闲 B200（至少 170 GiB 显存）、至少 256 GB 主机内存及首次运行 500 GiB 空闲磁盘。建议 1 TB 磁盘。固定使用 PyTorch 2.7.1 + CUDA 12.8，检查 Blackwell sm_100 和 BF16；不使用 sudo 或修改系统驱动。
+先确认旧管线已退出，再在原 Git 仓库中更新。**保留原 LATEN_STORE 和配置**；不要删除模型、数据、运行目录或重建一份空 store。
 
-```bash
-bash run.sh
-```
-
-指定物理 GPU 和所有大文件位置：
+GPU 3 继续原 4B 任务：
 
 ```bash
-GPU_ID=0 LATEN_STORE=/data/laten_baselines bash run.sh
+git pull --ff-only
+GPU_ID=3 LATEN_STORE=/data/laten_baselines bash run_remaining.sh --family 4b
 ```
 
-没有设置 `LATEN_STORE` 时使用本目录 `storage/`；之后续跑和查询必须用同一路径。建议用 tmux，或者：
+另一个终端中，GPU 5 执行 8B：
 
 ```bash
-nohup bash run.sh > run.log 2>&1 &
+GPU_ID=5 LATEN_STORE=/data/laten_baselines_8b bash run_remaining.sh --family 8b
 ```
 
-命令会安装环境、下载固定版本模型/数据、建立固定抽样清单、构建代码评分容器、校验选中的 54 条代码参考解、运行接口检查、训练、推理和汇总。完整测试源数据仍保留，用于校验和训练排重。网络需要访问 Hugging Face、GitHub、PyTorch wheel 站和 Docker 镜像源；按目标机需要设置代理和 HF_TOKEN，仓库不包含凭据。
+**目录名字带 `_8b` 不会选择 8B，必须显式写 `--family 8b`。** 该目录历史上重复产生的 4B 结果保留，但不算新的独立实验。两张卡必须使用不同 store；不要同时对同一个 store 启动两个管线。建议在 tmux 中运行。
 
-## 评测数量和抽样
+如果原来使用了自定义配置，在命令末尾加 `--config configs/local.json`，使用原内容。只有一张卡时，不指定 family 会依次完成两个规模：
 
-| 数据集 | 原始可用题数 | 当前每个方法/模型题数 | 指标 | Receiver 输出上限 |
+```bash
+GPU_ID=0 LATEN_STORE=/data/laten_baselines bash run_remaining.sh
+```
+
+脚本依次做本地环境/资产校验、免训练基线补测、collect、四阶段训练、已训练方法评测和 TXT 汇总。某个方法失败会记录阻塞并继续独立分支；最后仍有失败时返回非零状态，不会把失败当成零分或宣称完成。
+
+### 哪些会跳过，哪些需要继续
+
+| 已有内容 | 本版行为 |
+|---|---|
+| 版本满足要求的 Python 环境 | 跳过 pip 安装 |
+| 校验通过的模型、数据、源码、代码参考解测试 | 复用本地文件和测试记录；资产完整时不访问下载接口 |
+| 已完整评分、配置与来源身份一致的评测 | 跳过模型加载与重复推理；已完成评测也可替代对应 smoke |
+| 未完成的评测分片 | 仅继续剩余样本；已完成分片用于合并 |
+| 新版 v2 collect / 训练已完成或有合法断点 | 验证后复用，或从断点继续 |
+| 旧版失败的 training_cache | 原样保留；用修复后的过滤在 training_cache_v2 重新采集 |
+| 未知代码或配置身份不匹配 | 明确报错、保留旧文件，不混合不同实验 |
+
+本次只改结果持久化、汇总与续跑调度，保留 `471c487` 修复版的计算身份；三个免训练方法还兼容核验后的 `3272ff7` 身份。旧 collect 的错误门槛不能直接改成通过，必要的重新采集不属于重复已完成评测。
+
+**磁盘：报告中的 90 GiB 剩余空间不足以安全训练 8B。** 续跑主机预检至少要求 150 GiB，训练阶段还会按实际模型/优化器大小检查更高峰值。两份 store 共用分区同时训练时，建议先留出 400–500 GiB；检查不会为另一进程预留空间，也不会自动删除用户文件。
+
+## 2. 只导出统计，不启动实验
+
+下面命令使用系统 Python，不加载模型、不占 GPU、不下载、不重新测试；可以在训练期间单独执行以刷新统计：
+
+```bash
+LATEN_STORE=/data/laten_baselines bash run.sh export-txt
+LATEN_STORE=/data/laten_baselines_8b bash run.sh export-txt
+```
+
+`bash run.sh status` 和 `bash run.sh report` 也会刷新同一 TXT 目录。使用自定义配置时同样追加 `--config`。全部阶段完成或分支结束时，管线会自动刷新报告；长训练期间用上面的命令获取最新已写入的步数与损失。
+
+**只需传回各 store 的 `STATS_TXT/` 中全部 TXT 文件。** 先等导出命令返回再复制，两个 store 分开放置，避免同名文件覆盖。
+
+```text
+/data/laten_baselines/STATS_TXT/
+├── 00_README.txt                 # 第一个读：范围、口径与交接说明
+├── 01_INDEX.txt                  # 第二个读：顺序、字节数、SHA256
+├── 02_overview.p001.txt          # 完成数、模型版本、种子、配置上限
+├── 03_general.p001.txt           # 七任务得分、微/宏平均、整路径 Token
+├── 04_laten.p001.txt             # LATEN 总指标与效率
+├── 05_laten_4b_*.p001.txt        # 各方法分层、CF、条件错误率
+├── 05_laten_8b_*.p001.txt
+├── 06_training.p001.txt          # 各阶段步数、数值损失记录
+├── 07_collect.p001.txt           # 扫描量、保留量、各方法门槛
+├── 08_failures.p001.txt          # 历史阻塞次数、错误类型（无原始异常文本）
+└── 09_scheduler.p001.txt         # 已记录的各次调度历时
+```
+
+超长内容自动分为 `.p001.txt`、`.p002.txt` 等；**按 UTF-8 字节切分，不是按字符数**，中文也满足限制。索引列出实际生成的全部统计分片。`NA` 表示暂缺，不是 0 分；历史失败计数在成功续跑后仍保留，最终完成情况看 `02` / `03` / `04`。
+
+交接时以 store1 的 4B、store2 的 8B 为主要来源；各目录也可能显示另一规模的历史数据或待运行项，不要把重复 4B 结果相加。
+
+## 3. 本机续跑资产与交付结果的区别
+
+`STATS_TXT/` 是唯一交付目录，只有 TXT。本机仍需保留模型、数据、训练张量/目标、权重、优化器断点、身份清单、最小统计续跑记录和必要运行状态，否则无法断点续跑。这些**不需要传出服务器**。
+
+新评测不再保存推理文本、生成代码或 token IDs；本地语义评分记录保留配对统计所需的预测 bit 向量，TXT 只输出聚合指标。训练本身需要的教师目标留在训练资产中，不进入交付目录。旧版本已有原始文件不自动删除，也不复制到新报告。新通用样本若在评分落盘前被中断，该未完成样本可能重新生成；已经完成评分的样本不重做。
+
+内部路径（用于本机维护，不作为交付清单）：
+
+```text
+LATEN_STORE/
+  models/                         # 固定版本模型
+  data/                           # 原始数据与固定抽样清单
+  runs/<4b或8b>/training_cache_v2/  # 修复后采集资产
+  runs/<4b或8b>/training_collect_v2/# 四阶段训练与断点
+  runs/<4b或8b>/evaluation_sample10/             # 三个免训练方法
+  runs/<4b或8b>/semantic_parallel/
+  runs/<4b或8b>/evaluation_sample10_collect_v2/  # LatCom / Interlat
+  runs/<4b或8b>/semantic_parallel_collect_v2/
+  STATS_TXT/                      # 唯一对外交接目录
+```
+
+细节见 [TXT 交接策略](docs/TXT_HANDOFF.md)。旧文档提到的 JSON/CSV 汇总与原始输出交付要求，由本版 TXT 策略替代。
+
+## 4. 测评范围与指标
+
+| 数据集 | 源数据题数 | 每方法/模型实际题数 | 指标 | 输出 token 上限 |
 |---|---:|---:|---|---:|
 | GSM8K | 1,319 | 132 | 数值准确率 | 2,048 |
 | ARC-E | 2,376 | 238 | 选择题准确率 | 2,048 |
@@ -37,88 +113,49 @@ nohup bash run.sh > run.log 2>&1 &
 | MBPP+ | 378 | 38 | 扩展测试 pass@1 | 4,096 |
 | HumanEval+ | 164 | 16 | 扩展测试 pass@1 | 4,096 |
 | GPQA-Diamond | 198 | 20 | 选择题准确率 | 8,192 |
-| LATEN | 648 | **648** | 向量/事实/动作/CF 指标 | 2,048 |
+| LATEN | 648 | **648** | 事实向量、动作、CF 等 | 2,048 |
 
-七项通用任务每组 591 题，加 LATEN 为 1,239 题，五方法 × 两模型共 12,390 次。MedQA 源数据是已有 300 题子集，不是整个官方测试集。代码任务使用固定 HF EvalPlus parquet 扩展测试，不重新生成最新版测试。
+通用任务每组 591 题，种子 42，按复杂度代理的三等分分层抽取，包含较长/复杂任务；不是仅挑简单题。代理不是已验证的难度标签。MedQA 使用已有 300 题子集；代码任务使用固定 EvalPlus parquet 扩展测试。所有方法和模型共享固定 ID，不因答错、OOM 或解析失败换题。采样分数不能称为全量通用测试分数。
 
-通用任务使用固定种子 42，按复杂度代理排序分为三等分，每层抽取近似相同题数，避免仅保留短题。非代码任务代理是公开题目字符长度；代码任务优先使用参考代码中的分支、循环、推导式等 AST 节点数，再按题长排序。**这些是分层代理，不是经过验证的难度等级**；ARC-C、GPQA-Diamond 仍按同一比例测试。选择不使用任何方法的正确率、生成长度或运行时间。
+`03_general` 中逐任务准确率为正确数 / 已评分数；`micro_accuracy_completed` 按已评分题数加权，未完成时只是部分结果；`macro_accuracy_complete_only` 仅在七任务全部完成后计算等权平均。数值范围 0–1。代码测试基础设施错误不写成模型零分；报告中的全零不能单凭样本少归因。
 
-选中 ID、原划分/文件哈希、分层数量和样本原文写入 `storage/data/sampled10/`。两种模型、五种方法共享相同清单，续跑重新校验，不能因 OOM、解析失败或答错而换题。抽样结果不能称为完整通用测试集分数。
+LATEN 保持 162 案例、648 条件、486 BASE/CF 对，dev 108 / test 540，G4/G5/G6、I3/I6/I9、LOOKUP/RULE/DERIVE 均保留。报告向量精确率、逐 bit、确定性动作、模型动作诊断、目标/非目标 CF、整对向量与动作正确条件下的事实错误率；完整定义见 [LATEN 协议](docs/LATEN_BENCHMARK_PROTOCOL.md)。test 是已暴露的诊断划分。
 
-## 单卡并行如何工作
+效率覆盖**整条 Agent 任务路径**：生成文本 tokens、latent 位置、prompt tokens、模型 prefill、通信位置/字节分别统计，不能加在一起统称文本 token。并行耗时仅作争用条件下诊断；重叠任务累计秒数不等于阶段历时。`09_scheduler` 报告已结束调度尝试的记录，包含加载、评分和重试；缺失记录不补造。
 
-每次只运行一个方法/模型的评测阶段，阶段内默认两个独立进程共享同一张 B200，各自处理不重叠分片。进程之间不共享模型对象、KV 缓存或生成随机状态。通用题按固定次序分片，LATEN 按完整 BASE/CF 任务组分片，各 324 条、243 对。逐题种子不依赖 worker ID。
+## 5. collect 修复与训练方法
 
-- 每个并行进程的 PyTorch 显存分配器上限为总显存 45%；模型加载和 realignment 初始化通过锁串行完成，推理并行。
-- 显存不足的分片退出后，等待本阶段其他进程结束，再以单进程、90% 分配器上限继续。已生成或已评分结果不会重做。
-- 该上限不覆盖 CUDA 上下文和所有外部库分配，不保证任何长输入都不 OOM。串行仍不足则明确停止，保留记录；不降低 token 上限或删除题目。
-- 每个 worker 有独立原始输出、日志和状态；协调器原子合并结果。任务完整性和结果身份校验保留。
-- 训练数据生成、LatCom/Interlat 训练和模型规模之间仍串行，避免与推理争用资源。
+修复了 `Answer: Paris<|im_end|>` 因控制标记误判为错误的解析问题。只清理已知控制标记并匹配最终答案，不用推理中出现 gold 的子串放行。
 
-默认配置为 `inference_parallel.workers=2`。需要从一开始串行时可复制配置并设为 1，使用新的运行目录；中途直接改配置会触发身份校验。正常 OOM 自动降并发不需要改配置。不要另外手工启动多个 GPU 命令；由脚本内部调度并行。
+LatCom 使用与阶段一一致的 `[single_gold_Z; q]` 完整轨迹可答性门槛，并排除仅问题可解样本；Interlat 独立要求带证据的文本计划正确回答，不被冻结 Receiver 的 raw latent 可读性统一阻塞。两者各至少 32 条合格主样本，64 条辅助数学/代码样本不能充数。仍不满足时报告阻塞并继续其他独立任务，不训练随机替代权重。见 [collect 修复说明](docs/COLLECT_REPAIR.md)。
 
-## 训练与通信协议
+训练来源为 HotpotQA / MuSiQue train 与辅助数学/代码 train，LATEN 不进入训练。默认扫描 1,024 主候选、最多保留 512 主样本，每模型四阶段各 300 optimizer steps：LatCom stage1 / stage2、Interlat receiver / compression。训练串行，每 25 步保存断点；不缩减原训练预算。
 
-主训练数据仍是 HotpotQA distractor train / MuSiQue-Ans train：扫描 1,024 个候选，最多保留 512 个主样本，辅助 GSM8K train、排除测试 task ID 的 MBPP train 各 32 条。LatCom 主样本排除仅问题可解或单源完整 latent 不可解的题目；Interlat 主样本独立要求带证据的文本计划能正确回答。每个方法至少保留 32 条合格主样本，辅助样本不能满足门槛。某方法不满足条件时记录阻塞并继续独立方法/模型规模。rationale 利用支持事实和 gold answer 构造，没有额外独立模型或人工验证。LATEN 不进入训练。
+本包是统一协议迁移实现：**Interlat / LatCom 为 `paper_derived_port`，不是作者原始 checkpoint，也不是本工程 V6 权重。** 具体通信输入、目标函数及来源边界见 [方法协议](docs/PROTOCOL.md)。
 
-每种模型四阶段各 300 optimizer steps：LatCom 阶段一和二 global batch 64；Interlat 接收端 global batch 16；Interlat 压缩端 global batch 4。共 2,400 optimizer steps。保持原任务 CE、对比分离、教师分布和表示对齐等目标，具体公式见方法协议。microbatch 1、梯度累积/检查点、FP32 可训练参数和 BF16 autocast，默认 CPU 保存激活；每 25 步保存断点，完整导出 BF16 权重后默认删除最终优化器断点。不是 LoRA 替代实现，不保证默认预算收敛。
+## 6. 新服务器首次运行与并行
 
-通用任务仍使用三名 Sender，LatentMAS/Hidden/H2O/LatCom 的源轨迹 40 步；Interlat 每源 21 步。LatCom 压缩 64 个槽位，H2O 每源每头保留 64 个 prompt 位置。角色 prompt、输出上限、温度 0.6 / top-p 0.95 / top-k 0、逐题随机种子及评分器均保留。
-
-## LATEN Benchmark 保持全量
-
-冻结数据原样放在 `vendor/laten/data/`，逐文件核对 SHA256。162 个任务、648 个条件、486 个 BASE/CF 配对；dev 108 条、test 540 条。G4/G5/G6、I3/I6/I9、LOOKUP/RULE/DERIVE 和各角色私有事实边界均保留。test 是已暴露的诊断划分。
-
-Sender 轨迹深度仍为 10（Interlat 使用其训练后的 21 步接口），Receiver 贪心推理最多 2048 tokens，闭合后受约束逐位读出事实向量。继续报告完整向量、逐事实、确定性动作、模型 A–H 动作诊断、目标/非目标 CF、整对向量、截断和动作正确条件下的事实错误率。模型动作诊断另行计时。
-
-LatentMAS/H2O 传递历史 KV；Hidden 传递所有历史原始 prompt embeddings + 当前角色 10 步 latent；LatCom 在各接收边压缩为 64 槽位；Interlat 使用已训练压缩 Sender、接收 Adapter 和最终 Receiver LM。后两者是明确标记的非官方多跳迁移。细节见 [LATEN 协议](docs/LATEN_BENCHMARK_PROTOCOL.md)。
-
-## collect 修复与未完成部分续跑
-
-2026-09-10 修复了 `Answer: Paris<|im_end|>` 被错误拒绝的问题。完整 latent 过滤改为与第一阶段训练完全一致的 `[single_gold_Z; q]`；Interlat 使用独立的、答案已验证的带证据文本计划门槛。每个过滤记录保存原始输出、解析答案、gold、停止原因和独立门槛判断，不通过简单放行来凑足样本。详见 [修复说明](docs/COLLECT_REPAIR.md)。
-
-旧任务停止、磁盘足够后更新：
+Linux，Python 3.10–3.12 + venv，Git，可用 Docker，B200 至少 170 GiB 显存、主机内存至少 256 GB；首次运行至少 500 GiB 空闲磁盘，建议 1 TB。固定 PyTorch 2.7.1 / CUDA 12.8，检查 sm_100 和 BF16；不改系统驱动、不使用 sudo。大文件默认放 `storage/`，可指定路径：
 
 ```bash
-git pull --ff-only
-GPU_ID=3 LATEN_STORE=/data/laten_baselines bash run_remaining.sh --family 4b
+GPU_ID=0 LATEN_STORE=/data/laten_baselines bash run.sh
 ```
 
-第二张卡明确选择 8B：
+仅缺少资产时下载固定模型/数据、准备代码评分容器和参考解测试。需访问 Hugging Face、GitHub、PyTorch 和 Docker 源；凭据/代理由目标机配置。
+
+每个评测阶段默认 2 个推理进程共享一张卡，各 45% PyTorch 分配器上限；模型加载/realignment 初始化串行。OOM 分片等待其他进程结束后以单进程 90% 上限继续，保留完成结果、不减题、不降 token 上限。训练与模型规模之间串行。分配器上限不覆盖所有 CUDA 开销，不能保证任意输入都不 OOM。
+
+## 7. 常用命令与本地验证边界
 
 ```bash
-GPU_ID=5 LATEN_STORE=/data/laten_baselines_8b bash run_remaining.sh --family 8b
-```
-
-原来单卡执行两种规模时，直接 `bash run_remaining.sh` 即可。目录叫 `_8b` 不会自动选择模型。两次运行不要共享同一个 STORE；若共用磁盘分区，需同时预算两份训练峰值，建议先留出 400–500 GiB 空间。每个训练阶段会按实际模型文件大小检查新旧优化器断点共存空间，90 GiB 不足以安全训练 8B；不会自动删除数据。
-
-使用原 `LATEN_STORE` 和原配置（自定义配置用 `--config`）。下载的模型和原数据复用，已完成的三个免训练基线在校验完整身份/固定分片后跳过；未完成的推理分片继续。对于未经核验的远端代码变更，身份不匹配会报错并保留旧数据，不能把配置不一致的分数自动混合。
-
-原失败 `training_cache/` 保留，新的收集日志/资产位于 `training_cache_v2/`；新训练位于 `training_collect_v2/`。旧过滤记录没有原始生成文本，必须重新采集才能检验修正后的匹配，不能直接把旧失败状态改为通过。新 LatCom/Interlat 评测目录分别是 `evaluation_sample10_collect_v2/` 和 `semantic_parallel_collect_v2/`；三个免训练方法继续沿用 `evaluation_sample10/`、`semantic_parallel/`。旧优化器和已训练导出不自动迁入新训练方案。
-
-每个方法目录下 `shards/` 保存独立原始输出，协调器合并为根部 `results.jsonl`。单个方法/家族失败写入 `branch_failures.jsonl`，其他独立分支仍尝试运行；存在失败时全流程最终返回非零状态，不会宣称全套完成。新版训练完成后，`bash run.sh eval-all` 可单独续测；`bash run.sh status` 查看完整 80 单元。
-
-单独排查收集（需要已安装环境和下载数据）：
-
-```bash
+# 单独继续收集（已有环境与数据）
 GPU_ID=3 LATEN_STORE=/data/laten_baselines bash run.sh collect --family 4b
-```
-
-## Token、时间和结果读取
-
-`bash run.sh status` 输出 80 单元完成情况。通用表为 `reports/summary.csv`，语义表为 `reports/semantic_summary.csv`，总体为 `reports/suite_summary.json`。两个表均保留逐任务路径的 Token 及其他效率字段；LATEN 分层详情在 `semantic_summary.json`。
-
-生成文本 Token、latent 位置、prompt Token、模型 prefill、逻辑通信位置/字节分别统计，覆盖整条 Agent 路径，不能混称为文本 Token。原始 token IDs、停止原因和通信记录保留。并行不会改变计数定义，但浮点运行环境不保证跨配置输出逐 bit 一致。
-
-耗时只作有争用条件下的诊断，不据此宣称独占 GPU 速度优劣；多个任务耗时相加是重叠任务的累计秒数，不是整阶段历时。各阶段 `scheduler_wall.jsonl` 额外保存包含加载、评分和重试的协调器历时。每行 `execution` 标记并发上限、分片和重试模式。OOM/下载/容器基础设施错误保持未评分，正常错误答案、代码测试不通过、原生推理截断按既定规则计分。
-
-重复 `bash run.sh` 续跑相同新版配置；已评分跳过、已生成沿用，训练从合法断点恢复。模型在 `storage/models/`，缓存 `storage/cache/`，数据 `storage/data/`，训练 `storage/runs/<模型>/training_collect_v2/`；环境 `.venv/`。Docker 镜像按宿主 daemon 的存储位置管理。
-
-## 本地验证边界
-
-```bash
+# 训练完成后只继续评测
+GPU_ID=3 LATEN_STORE=/data/laten_baselines bash run.sh eval-all --family 4b
+# 无 GPU 的静态/调度/续跑/TXT 检查
 bash run.sh validate
+# 已安装模型依赖时的小模型 CPU 检查
 .venv/bin/python -m unittest discover -s tests -p 'test_tiny*.py' -v
 ```
 
-本地验证覆盖分层抽样、完整 BASE/CF 分片、真实 CPU 子进程并发、OOM 调度重试夹具、合并/断点/身份校验、原评分协议，以及小型 Qwen3 CPU 数值和梯度。详细结果见 `evidence/validation.json`。**没有在准备服务器下载完整模型或启动本套 GPU 训练，尚无目标 B200 的并行显存峰值、加速倍数或正式跑分。**
+本版 **43 项静态/调度测试 + 16 项小模型 CPU 测试通过**，包括旧身份复用、EOS 过滤修复、独立门槛、分片续跑、完整 648/486 指标一致性、禁止字段移除、中文 TXT 字节限制与索引。验证记录见 `evidence/validation.json`。这些证明本地工程检查通过；没有在准备服务器重跑完整模型/B200 实验，修复后的实际保留数、训练收敛及跑分仍由目标机续跑结果决定。

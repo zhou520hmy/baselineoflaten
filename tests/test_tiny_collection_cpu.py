@@ -31,7 +31,7 @@ class CollectionCPU(unittest.TestCase):
   with tempfile.TemporaryDirectory(dir=C.ROOT/'tests') as d,patch.object(C,'STORE',Path(d)),patch.object(C,'install_signals'),patch.object(K,'Engine',FakeEngine):
    self.setup_store(Path(d));K.collect('4b',cfg);root=C.cache_dir('4b');meta=C.read(root/'complete.json')
    self.assertEqual(meta['main_retained_by_method'],{'latcom':0,'interlat':2});self.assertEqual(meta['method_ready'],{'latcom':False,'interlat':True});self.assertEqual(C.read(root/'status.json')['gate_rejections']['latcom']['full_latent_unanswerable'],2)
-   rows=C.rows(root/'records.jsonl');self.assertIn('<|im_end|>',rows[0]['probes']['evidence_text_plan']['raw_text']);self.assertEqual(rows[0]['eligible_for'],['interlat'])
+   rows=C.rows(root/'records.jsonl');self.assertNotIn('raw_text',rows[0]['probes']['evidence_text_plan']);self.assertTrue(rows[0]['probes']['evidence_text_plan']['correct']);self.assertEqual(rows[0]['eligible_for'],['interlat'])
    saved=torch.load(root/rows[0]['file'],weights_only=True);self.assertEqual(saved['plan_text'],'Answer: Paris')
    self.assertEqual((Path(d)/'runs/4b/training_cache/failure.txt').read_text(),'original failure remains')
    with patch.object(K,'Engine',side_effect=AssertionError('No model reload for a completed scan')):K.collect('4b',cfg)

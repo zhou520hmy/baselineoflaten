@@ -68,5 +68,5 @@ class SamplingParallel(unittest.TestCase):
  def test_empty_reports_use_new_denominators(self):
   from suite import report as R,report_semantic as S
   with tempfile.TemporaryDirectory(dir=C.ROOT/'tests') as d,patch.object(C,'STORE',Path(d)),patch.object(R,'STORE',Path(d)):
-   self.assertFalse(R.report(C.config(),False));general=C.read(Path(d)/'reports/summary.json');sem=C.read(Path(d)/'reports/semantic_summary.json')
+   self.assertFalse(R.report(C.config(),False));general=R.general_statistics(C.config());sem=S.semantic_statistics(C.config());self.assertTrue((Path(d)/'STATS_TXT/00_README.txt').exists());self.assertFalse((Path(d)/'reports/summary.json').exists())
    self.assertEqual(sum(r['expected'] for r in general['cells']),5910);self.assertEqual(sum(r['expected'] for r in sem['cells']),6480);self.assertEqual(len(general['cells'])+len(sem['cells']),80)
