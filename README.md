@@ -71,3 +71,8 @@ bash run.sh validate
 ```
 
 43 static/scheduler/continuation/TXT tests and 16 tiny CPU tests pass locally; see `evidence/validation.json`. These are engineering checks, not a new B200 run or evidence that collection retention, training convergence or benchmark scores have succeeded on the target server.
+
+
+## Local A100 canary completed
+
+The subsequent 2026-09-10 A100 check passed 11 real Qwen3-4B interface/collection/adapter tests and 4 tiny-Qwen3 CUDA training-stage tests. Real collection used four synthetic candidates; full training used a random reduced model, two steps per stage, with actual pause/resume and export reload. Learned real-4B interfaces used untrained modules sharing the frozen backbone. These are not benchmark scores, trained-baseline validation, or B200 full-model memory measurements. See the [statistics-only reading directory](evidence/a100_canary_20260910/00_README.txt) and [reproduction instructions](README_ZH.md#8-已完成的本地-a100-工程检查). Production B200 guards and compute code are unchanged.

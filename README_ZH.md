@@ -159,3 +159,19 @@ bash run.sh validate
 ```
 
 本版 **43 项静态/调度测试 + 16 项小模型 CPU 测试通过**，包括旧身份复用、EOS 过滤修复、独立门槛、分片续跑、完整 648/486 指标一致性、禁止字段移除、中文 TXT 字节限制与索引。验证记录见 `evidence/validation.json`。这些证明本地工程检查通过；没有在准备服务器重跑完整模型/B200 实验，修复后的实际保留数、训练收敛及跑分仍由目标机续跑结果决定。
+
+
+## 8. 已完成的本地 A100 工程检查
+
+2026-09-10 在空闲 A100 40GB 上完成 **11 项真实 Qwen3-4B 检查 + 4 项同架构小模型 GPU 训练检查**，全部通过。统计与读取索引见 [A100 统计目录](evidence/a100_canary_20260910/00_README.txt)。真实 collect 的 2 条人工主候选中，LatCom 保留 1 条、Interlat 保留 2 条；正式 32 条门槛没有降低。四个训练阶段用随机小模型各跑 2 步，实际检查了暂停恢复、优化器、梯度和导出重载。没有据此声明完整训练成功或基线涨分。
+
+真实 4B 测试中，LatCom/Interlat 的未训练模块共享冻结 backbone，只检查通信接口；接收适配器做一次真实梯度更新。三个免训练方法各测一个 LATEN G4/I3 dev BASE 样例。通用输出上限缩为 48，语义接口仍为 2048。使用本地已有 PyTorch 2.5.1+cu121 / Transformers 4.57.6；正式 B200 环境与入口未修改。
+
+以下是独立可选测试，不是正式续跑入口。先确认选定 A100 空闲，`--model` 指向已有 Qwen3-4B 本地目录，`--store` 必须是本包内独立目录。运行 real 和 tiny 两条命令时保持串行。Python 解释器必须已安装 torch/transformers 等依赖；脚本不安装环境或下载模型。
+
+```bash
+CUDA_VISIBLE_DEVICES=2 .venv/bin/python scripts/run_a100_canary.py --phase real --model /path/to/Qwen3-4B --store logs/a100_check/real
+CUDA_VISIBLE_DEVICES=2 .venv/bin/python scripts/run_a100_canary.py --phase tiny --model /path/to/Qwen3-4B --store logs/a100_check/tiny
+```
+
+读取对应 store 的 `STATS_TXT/`。这些测试不能替代 B200 双进程显存、正式训练集保留率、4B/8B 全参数训练和完整任务矩阵的验证。

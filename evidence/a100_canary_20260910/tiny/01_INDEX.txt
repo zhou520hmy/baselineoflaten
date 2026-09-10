@@ -1,0 +1,2 @@
+READ ORDER | BYTES | SHA256 | DESCRIPTION
+02_canary.p001.txt | 9323 | 6056b4fce7e54d0b31d236b6a959695a518c9113193ef194facf2c248b9eec8b | A100 engineering checks; no benchmark performance claims
